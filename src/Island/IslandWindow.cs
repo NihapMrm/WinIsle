@@ -211,6 +211,7 @@ class IslandWindow : GlassWindow
     {
         if (!open) return;
         open = false;
+        (yes ? IslandSound.Yes : IslandSound.NotYet).Play();
         glow.BeginAnimation(OpacityProperty, null);
         var result = reminders[shownIndex].Answer(shown, yes);
         confirmed = yes;
@@ -248,6 +249,7 @@ class IslandWindow : GlassWindow
         check.Opacity = 0;
         SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13); // back on top of other topmost windows: NOSIZE | NOMOVE | NOACTIVATE
         CaptureBackdrop();
+        (notice.Sound ?? IslandSound.Appear).Play();
         Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2);
         Morph(CompactW, CompactH, CompactH / 2);
         Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);

@@ -7,6 +7,7 @@ class IslandNotice
     public string Key, Title, Detail, Time, YesLabel;
     public Geometry Icon;
     public Color Accent;
+    public System.Media.SoundPlayer Sound; // plays as the island appears; null uses IslandSound.Appear
 }
 
 // The two labels of the compact pill after an answer.

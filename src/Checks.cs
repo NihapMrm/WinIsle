@@ -30,7 +30,31 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + DataMoveFailures();
+    return fails + DataMoveFailures() + SoundFailures();
+    }
+
+    // A chime must be valid PCM, hit its volume exactly (no clipping) and end silent (no click).
+    static int SoundFailures()
+    {
+        var wav = IslandSound.Wav(0.3, 500, 440, 0, 660, 100);
+        int peak = 0, fails = 0;
+        for (int i = 44; i < wav.Length; i += 2) peak = Math.Max(peak, Math.Abs((int)BitConverter.ToInt16(wav, i)));
+        if (System.Text.Encoding.ASCII.GetString(wav, 0, 4) != "RIFF" || BitConverter.ToInt32(wav, 40) != wav.Length - 44) fails++;
+        if ((wav.Length - 44) / 2 != 22050) fails++;
+        if (Math.Abs(peak - 0.3 * short.MaxValue) > 2) fails++;
+        if (Math.Abs((int)BitConverter.ToInt16(wav, wav.Length - 2)) > 8) fails++;
+
+        // A water drop's pitch rises: more zero crossings in its second 30 ms than its first.
+        var drop = IslandSound.Drops(0.3, 200, 800, 0);
+        Func<int, int, int> crossings = (from, to) =>
+        {
+            int n = 0;
+            for (int i = from; i < to; i++) if (BitConverter.ToInt16(drop, 44 + 2 * i) < 0 != BitConverter.ToInt16(drop, 46 + 2 * i) < 0) n++;
+            return n;
+        };
+        if (crossings(0, 1323) >= crossings(1323, 2646)) fails++;
+        if (new WaterReminder(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero).Due().Sound != IslandSound.Water) fails++;
+        return fails;
     }
 
     // Moving data must never lose any: existing targets stay, sources stay.

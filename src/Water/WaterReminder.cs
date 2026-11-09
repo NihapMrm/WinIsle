@@ -28,7 +28,7 @@ class WaterReminder : IReminder
         return new IslandNotice
         {
             Key = "water", Title = "Drink water", Detail = "Have a glass of water", YesLabel = "Drank",
-            Time = Prayers.Now.ToString("h:mm tt", CultureInfo.InvariantCulture), Icon = DropShape, Accent = Accent,
+            Time = Prayers.Now.ToString("h:mm tt", CultureInfo.InvariantCulture), Icon = DropShape, Accent = Accent, Sound = IslandSound.Water,
         };
     }
 
