@@ -139,6 +139,8 @@ static class Prayers
         int current, best;
         Tracker.Streaks(new[] { 3, 3, 3, 4, 3, 0, 3, 2 }, out current, out best);
         if (current != 2 || best != 3) fails++;
+        if (TodoPanel.PrayerIsland.WaterWait(true, false) != TimeSpan.FromMinutes(90)) fails++;
+        if (TodoPanel.PrayerIsland.WaterWait(false, false) != TimeSpan.FromMinutes(10)) fails++;
         if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
         return fails;
     }
@@ -286,8 +288,9 @@ class TodoPanel : Window
     {
         if (args.Contains("--check")) Environment.Exit(Prayers.Check());
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
-        // --demo previews the prayer island alone, with "Not yet" coming back after 10 seconds.
-        app.Run(args.Contains("--demo") ? (Window)new PrayerIsland(true) : new TodoPanel());
+        // --demo and --demo-water preview one island alone, with "Not yet" coming back after 10 seconds.
+        bool demoWater = args.Contains("--demo-water");
+        app.Run(demoWater || args.Contains("--demo") ? (Window)new PrayerIsland(true, demoWater) : new TodoPanel());
     }
 
     TodoPanel()
@@ -707,9 +710,12 @@ class TodoPanel : Window
         const double CompactW = 244, CompactH = 44;
         const double OpenW = 430, OpenH = 126, OpenR = 34; // OpenR = button radius 20 + inset 14, so the curves are concentric
 
-        static readonly Color Gold = Color.FromRgb(255, 214, 140);
+        static readonly Color Gold = Color.FromRgb(255, 214, 140), WaterBlue = Color.FromRgb(120, 200, 255);
+        static readonly Geometry MoonShape = BuildMoon();
+        static readonly Geometry DropShape = Geometry.Parse("M12,2 C12,2 5,10 5,15 A7,7 0 0 0 19,15 C19,10 12,2 12,2 Z");
 
-        readonly bool demo;
+        readonly bool demo, demoWater;
+        readonly Prayer waterNotice = new Prayer { Name = "Drink water" };
         readonly Prayer demoPrayer = new Prayer { Name = "Asr", At = DateTime.Now };
         readonly SpringValue w = new SpringValue(), h = new SpringValue(), r = new SpringValue();
         readonly Border pill = new Border();
@@ -719,9 +725,10 @@ class TodoPanel : Window
         readonly TextBlock compactLeft = new TextBlock { FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
         readonly TextBlock compactRight = new TextBlock { FontSize = 13, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 18, 0) };
         readonly TextBlock nameText = new TextBlock { FontSize = 20, FontWeight = FontWeights.SemiBold };
+        readonly TextBlock detailText = new TextBlock { FontSize = 12.5, Opacity = 0.8, Margin = new Thickness(0, -2, 0, 0) };
         readonly TextBlock timeText = new TextBlock { FontSize = 20, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
-        readonly System.Windows.Shapes.Ellipse glow = new System.Windows.Shapes.Ellipse { Width = 44, Height = 44, Opacity = 0, Fill = new RadialGradientBrush(Color.FromArgb(120, Gold.R, Gold.G, Gold.B), Color.FromArgb(0, Gold.R, Gold.G, Gold.B)) };
-        readonly System.Windows.Shapes.Path smallMoon = Moon(18);
+        readonly System.Windows.Shapes.Ellipse glow = new System.Windows.Shapes.Ellipse { Width = 44, Height = 44, Opacity = 0 };
+        readonly System.Windows.Shapes.Path smallIcon = Moon(18), bigIcon = Moon(24);
         readonly System.Windows.Shapes.Path check = new System.Windows.Shapes.Path
         {
             Data = Geometry.Parse("M3,10.5 L8,15.5 L17,5"), Width = 20, Height = 20, Opacity = 0,
@@ -730,6 +737,7 @@ class TodoPanel : Window
             StrokeDashArray = new DoubleCollection { 9, 9 }, StrokeDashOffset = 9,
         };
         Grid compact, header, actions;
+        TextBlock yesLabel;
 
         IntPtr hwnd;
         double dpi = 1;
@@ -737,11 +745,21 @@ class TodoPanel : Window
         TimeSpan lastFrame;
         Prayer shown; // what the island is displaying; null while hidden
         string prayedKey, snoozedKey;
-        DateTime snoozedUntil;
+        DateTime snoozedUntil, waterDue; // waterDue is UTC, so changing the prayer time zone can't shift it
 
-        internal PrayerIsland(bool demo)
+        bool ShowingWater { get { return shown == waterNotice; } }
+
+        internal static TimeSpan WaterWait(bool drank, bool demo)
+        {
+            if (demo) return TimeSpan.FromSeconds(drank ? 20 : 10);
+            return TimeSpan.FromMinutes(drank ? 90 : 10);
+        }
+
+        internal PrayerIsland(bool demo, bool demoWater = false)
         {
             this.demo = demo;
+            this.demoWater = demoWater;
+            waterDue = demoWater ? DateTime.UtcNow : demo ? DateTime.MaxValue : DateTime.UtcNow + WaterWait(true, false);
             Title = "Prayer reminder";
             Width = WinW; Height = WinH;
             WindowStyle = WindowStyle.None;
@@ -766,7 +784,7 @@ class TodoPanel : Window
 
             // Compact: icon and label on the left, detail on the right.
             var iconSlot = new Grid { Width = 20, Height = 20, Margin = new Thickness(0, 0, 8, 0) };
-            iconSlot.Children.Add(smallMoon);
+            iconSlot.Children.Add(smallIcon);
             iconSlot.Children.Add(check);
             var left = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
             left.Children.Add(iconSlot);
@@ -779,13 +797,12 @@ class TodoPanel : Window
             var tile = new Grid { Width = 44, Height = 44, Margin = new Thickness(0, 0, 12, 0) };
             tile.Children.Add(glow);
             tile.Children.Add(new System.Windows.Shapes.Ellipse { Fill = new SolidColorBrush(Color.FromArgb(26, 255, 255, 255)) });
-            var bigMoon = Moon(24);
-            bigMoon.HorizontalAlignment = HorizontalAlignment.Center;
-            bigMoon.VerticalAlignment = VerticalAlignment.Center;
-            tile.Children.Add(bigMoon);
+            bigIcon.HorizontalAlignment = HorizontalAlignment.Center;
+            bigIcon.VerticalAlignment = VerticalAlignment.Center;
+            tile.Children.Add(bigIcon);
             var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
             titles.Children.Add(nameText);
-            titles.Children.Add(new TextBlock { Text = "It's time to pray", FontSize = 12.5, Opacity = 0.8, Margin = new Thickness(0, -2, 0, 0) });
+            titles.Children.Add(detailText);
             var who = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
             who.Children.Add(tile);
             who.Children.Add(titles);
@@ -799,6 +816,7 @@ class TodoPanel : Window
             actions.ColumnDefinitions.Add(new ColumnDefinition());
             var notYet = MakeButton("Not yet", Color.FromArgb(38, 255, 255, 255), Color.FromArgb(64, 255, 255, 255), Colors.White, () => Answer(false));
             var prayed = MakeButton("Prayed", Green, Color.FromRgb(76, 224, 112), Color.FromRgb(4, 40, 16), () => Answer(true));
+            yesLabel = (TextBlock)prayed.Child;
             Grid.SetColumn(prayed, 2);
             actions.Children.Add(notYet);
             actions.Children.Add(prayed);
@@ -836,13 +854,18 @@ class TodoPanel : Window
             };
         }
 
-        internal static System.Windows.Shapes.Path Moon(double size)
+        static Geometry BuildMoon()
         {
             var crescent = Geometry.Combine(new EllipseGeometry(new Point(12, 12), 10, 10), new EllipseGeometry(new Point(16.2, 9.6), 8.3, 8.3), GeometryCombineMode.Exclude, null);
             var shape = new GeometryGroup();
             shape.Children.Add(crescent);
             shape.Children.Add(Geometry.Parse("M18.6,6.2 L19.5,8.5 L21.8,9.4 L19.5,10.3 L18.6,12.6 L17.7,10.3 L15.4,9.4 L17.7,8.5 Z"));
-            return new System.Windows.Shapes.Path { Data = shape, Width = size, Height = size, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Gold) };
+            return shape;
+        }
+
+        internal static System.Windows.Shapes.Path Moon(double size)
+        {
+            return new System.Windows.Shapes.Path { Data = MoonShape, Width = size, Height = size, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Gold) };
         }
 
         static Border MakeButton(string label, Color rest, Color hover, Color ink, Action click)
@@ -863,7 +886,7 @@ class TodoPanel : Window
             b.MouseEnter += (s, e) => Anim(fill, hover);
             b.MouseLeave += (s, e) => { Anim(fill, rest); press(1, 240); };
             b.MouseLeftButtonDown += (s, e) => press(0.94, 140);
-            b.MouseLeftButtonUp += (s, e) => { press(1, 280); if (b.IsMouseOver) click(); };
+            b.MouseLeftButtonUp += (s, e) => { press(1, 280); click(); };
             return b;
         }
 
@@ -872,44 +895,59 @@ class TodoPanel : Window
         void Tick()
         {
             var now = Prayers.Now;
-            var p = demo ? demoPrayer : Prayers.Current(now, Prayers.TzAt(now));
+            var p = demoWater ? null : demo ? demoPrayer : Prayers.Current(now, Prayers.TzAt(now));
             bool done = p != null && (demo ? p.Key == prayedKey : Tracker.Has(p.Key));
+            bool prayerDue = p != null && !done && !(p.Key == snoozedKey && now < snoozedUntil);
             if (shown != null)
             {
+                if (!open) return;
+                // A due prayer replaces water, which stays due and returns afterwards.
+                if (ShowingWater) { if (prayerDue) Dismiss(); }
                 // The prayer's time ended with the island still up. The next tick shows the new one.
-                if (open && (p == null || p.Key != shown.Key || done)) Dismiss();
+                else if (p == null || p.Key != shown.Key || done) Dismiss();
                 return;
             }
-            if (p == null || done) return;
-            if (p.Key == snoozedKey && now < snoozedUntil) return;
-            Present(p);
+            if (prayerDue) Present(p);
+            else if (DateTime.UtcNow >= waterDue)
+            {
+                waterNotice.At = now;
+                Present(waterNotice);
+            }
         }
 
-        internal void Answer(bool prayed)
+        internal void Answer(bool yes)
         {
             if (!open) return;
             open = false;
             glow.BeginAnimation(OpacityProperty, null);
             var name = shown.Name;
-            if (prayed)
+            string backIn = demo ? "Back in 10 sec" : "Back in 10 min";
+            if (ShowingWater)
             {
-                if (demo) prayedKey = shown.Key;
-                else Tracker.Mark(shown.Key, Prayers.Now);
+                waterDue = DateTime.UtcNow + WaterWait(yes, demo);
+                if (yes && demo) prayedKey = "water"; // ends the demo once the island has gone
+                compactLeft.Text = yes ? "Drank" : "Not yet";
+                compactRight.Text = yes ? (demo ? "Next in 20 sec" : "Next in 90 min") : backIn;
             }
             else
             {
-                snoozedKey = shown.Key;
-                snoozedUntil = Prayers.Now + (demo ? TimeSpan.FromSeconds(10) : TimeSpan.FromMinutes(10));
+                if (!yes)
+                {
+                    snoozedKey = shown.Key;
+                    snoozedUntil = Prayers.Now + (demo ? TimeSpan.FromSeconds(10) : TimeSpan.FromMinutes(10));
+                }
+                else if (demo) prayedKey = shown.Key;
+                else Tracker.Mark(shown.Key, Prayers.Now);
+                compactLeft.Text = yes ? "Prayed" : "Not yet";
+                compactRight.Text = yes ? name : backIn;
             }
-            compactLeft.Text = prayed ? "Prayed" : "Not yet";
-            compactRight.Text = prayed ? name : demo ? "Back in 10 sec" : "Back in 10 min";
             Conceal(header);
             Conceal(actions);
             Morph(CompactW, CompactH, CompactH / 2);
             Reveal(compact, 110);
-            if (prayed)
+            if (yes)
             {
-                smallMoon.Opacity = 0;
+                smallIcon.Opacity = 0;
                 check.Opacity = 1;
                 Go(check, System.Windows.Shapes.Shape.StrokeDashOffsetProperty, 0, 360, Out, 180, null, 9);
             }
@@ -921,9 +959,16 @@ class TodoPanel : Window
         internal void Present(Prayer p)
         {
             shown = p;
+            bool water = ShowingWater;
+            var accent = water ? WaterBlue : Gold;
+            detailText.Text = water ? "Have a glass of water" : "It's time to pray";
+            yesLabel.Text = water ? "Drank" : "Prayed";
+            smallIcon.Data = bigIcon.Data = water ? DropShape : MoonShape;
+            smallIcon.Fill = bigIcon.Fill = new SolidColorBrush(accent);
+            glow.Fill = new RadialGradientBrush(Color.FromArgb(120, accent.R, accent.G, accent.B), Color.FromArgb(0, accent.R, accent.G, accent.B));
             nameText.Text = compactLeft.Text = p.Name;
             timeText.Text = compactRight.Text = p.At.ToString("h:mm tt", CultureInfo.InvariantCulture);
-            smallMoon.Opacity = 1;
+            smallIcon.Opacity = 1;
             check.Opacity = 0;
             SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13); // back on top of other topmost windows: NOSIZE | NOMOVE | NOACTIVATE
             CaptureBackdrop();
