@@ -12,7 +12,8 @@ static class IslandSound
     public static readonly SoundPlayer Appear = Load(Wav(0.32, 800, 784, 0, 1175, 110));
     public static readonly SoundPlayer Yes = Load(Wav(0.36, 850, 659, 0, 784, 90, 1047, 180));
     public static readonly SoundPlayer NotYet = Load(Wav(0.24, 500, 587, 0, 440, 90));
-    public static readonly SoundPlayer Water = Load(Drops(0.4, 800, 900, 0, 1250, 170, 760, 340));
+    public static readonly SoundPlayer Notify = Load(Wav(0.26, 600, 1047, 0, 1319, 80));
+    public static readonly SoundPlayer Water =Load(Drops(0.4, 800, 900, 0, 1250, 170, 760, 340));
 
     static SoundPlayer Load(byte[] wav)
     {

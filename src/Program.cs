@@ -8,6 +8,7 @@ static class Program
     static void Main(string[] args)
     {
         if (args.Contains("--check")) Environment.Exit(Checks.Run());
+        if (args.Contains("--restore-banners")) { WindowsNotifications.RestoreBanners(WindowsNotifications.SettingsKey); return; }
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
         // --demo and --demo-water preview one island alone, with "Not yet" coming back after 10 seconds.
         IReminder demo = args.Contains("--demo-water") ? new WaterReminder(TimeSpan.FromSeconds(20), TimeSpan.FromSeconds(10), TimeSpan.Zero)
@@ -28,6 +29,6 @@ static class Program
         Prayers.LoadSettings();
         Tracker.Load();
         // Highest priority first. New reminders are added here.
-        new IslandWindow(PrayerReminder.Live(), new WaterReminder()).Show();
+        new IslandWindow(PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live()).Show();
     }
 }

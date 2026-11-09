@@ -26,7 +26,17 @@ class IslandWindow : GlassWindow
     const double WinW = 500, WinH = 170, Inset = 2, BlurMargin = 40;
     const double SeedW = 76, SeedH = 26;
     const double CompactW = 244, CompactH = 44;
-    const double OpenW = 430, OpenH = 126, OpenR = 34; // OpenR = button radius 20 + inset 14, so the curves are concentric
+
+    // The open island's dimensions. Corner radius = button radius + padding, so the curves are concentric.
+    internal class IslandSize
+    {
+        public double Width, Pad, Tile, ButtonH, Gap, TitleFont, DetailFont, LineH, TextW, IconSize, ButtonFont;
+        public double OpenH { get { return 3 * Pad + Tile + ButtonH; } }
+        public double OpenR { get { return ButtonH / 2 + Pad; } }
+    }
+
+    internal static readonly IslandSize Regular = new IslandSize { Width = 430, Pad = 14, Tile = 44, ButtonH = 40, Gap = 12, TitleFont = 20, DetailFont = 12.5, LineH = 17, TextW = 246, IconSize = 24, ButtonFont = 14 };
+    internal static readonly IslandSize Small = new IslandSize { Width = 360, Pad = 12, Tile = 36, ButtonH = 32, Gap = 10, TitleFont = 16, DetailFont = 11.5, LineH = 15.5, TextW = 206, IconSize = 20, ButtonFont = 12.5 };
 
     readonly IReminder[] reminders; // highest priority first
     readonly SpringValue w = new SpringValue(), h = new SpringValue(), r = new SpringValue();
@@ -34,13 +44,14 @@ class IslandWindow : GlassWindow
     readonly Image backdrop = new Image { Stretch = Stretch.Fill, Margin = new Thickness(-BlurMargin), Effect = new BlurEffect { Radius = 36, RenderingBias = RenderingBias.Performance } };
     readonly Grid stage = new Grid { Opacity = 0 };
     readonly RectangleGeometry clip = new RectangleGeometry();
-    readonly TextBlock compactLeft = new TextBlock { FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-    readonly TextBlock compactRight = new TextBlock { FontSize = 13, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 18, 0) };
-    readonly TextBlock nameText = new TextBlock { FontSize = 20, FontWeight = FontWeights.SemiBold };
-    readonly TextBlock detailText = new TextBlock { FontSize = 12.5, Opacity = 0.8, Margin = new Thickness(0, -2, 0, 0) };
-    readonly TextBlock timeText = new TextBlock { FontSize = 20, FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
-    readonly System.Windows.Shapes.Ellipse glow = new System.Windows.Shapes.Ellipse { Width = 44, Height = 44, Opacity = 0 };
-    readonly System.Windows.Shapes.Path smallIcon = MakeIcon(18), bigIcon = MakeIcon(24);
+    readonly TextBlock compactLeft = new TextBlock { FontSize = 14, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 122, TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly TextBlock compactRight = new TextBlock { FontSize = 13, Opacity = 0.85, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 0, 18, 0), MaxWidth = 104, TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly TextBlock nameText = new TextBlock { FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly TextBlock detailText = new TextBlock { Opacity = 0.8, Margin = new Thickness(0, -2, 0, 0), TextWrapping = TextWrapping.Wrap, TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly TextBlock timeText = new TextBlock { FontWeight = FontWeights.Medium, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+    readonly System.Windows.Shapes.Ellipse glow = new System.Windows.Shapes.Ellipse { Opacity = 0 };
+    readonly System.Windows.Shapes.Path smallIcon = MakeIcon(18), bigIcon = MakeIcon(0);
+    readonly Image smallLogo = new Image { Width = 20, Height = 20 }, bigLogo = new Image { Stretch = Stretch.UniformToFill };
     readonly System.Windows.Shapes.Path check = new System.Windows.Shapes.Path
     {
         Data = Geometry.Parse("M3,10.5 L8,15.5 L17,5"), Width = 20, Height = 20, Opacity = 0,
@@ -48,8 +59,9 @@ class IslandWindow : GlassWindow
         StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
         StrokeDashArray = new DoubleCollection { 9, 9 }, StrokeDashOffset = 9,
     };
-    Grid compact, header, actions;
-    TextBlock yesLabel;
+    Grid compact, header, actions, tile;
+    TextBlock yesLabel, noLabel;
+    Border yesButton, noButton;
 
     IntPtr hwnd;
     double dpi = 1;
@@ -90,6 +102,9 @@ class IslandWindow : GlassWindow
         // Compact: icon and label on the left, detail on the right.
         var iconSlot = new Grid { Width = 20, Height = 20, Margin = new Thickness(0, 0, 8, 0) };
         iconSlot.Children.Add(smallIcon);
+        iconSlot.Children.Add(smallLogo);
+        RenderOptions.SetBitmapScalingMode(smallLogo, BitmapScalingMode.HighQuality);
+        RenderOptions.SetBitmapScalingMode(bigLogo, BitmapScalingMode.HighQuality);
         iconSlot.Children.Add(check);
         var left = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
         left.Children.Add(iconSlot);
@@ -99,29 +114,33 @@ class IslandWindow : GlassWindow
         compact.Children.Add(compactRight);
 
         // Open: tile, name and time on top, the two actions underneath.
-        var tile = new Grid { Width = 44, Height = 44, Margin = new Thickness(0, 0, 12, 0) };
+        tile = new Grid();
         tile.Children.Add(glow);
         tile.Children.Add(new System.Windows.Shapes.Ellipse { Fill = new SolidColorBrush(Color.FromArgb(26, 255, 255, 255)) });
         bigIcon.HorizontalAlignment = HorizontalAlignment.Center;
         bigIcon.VerticalAlignment = VerticalAlignment.Center;
         tile.Children.Add(bigIcon);
+        tile.Children.Add(bigLogo);
         var titles = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         titles.Children.Add(nameText);
         titles.Children.Add(detailText);
         var who = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
         who.Children.Add(tile);
         who.Children.Add(titles);
-        header = Layer(OpenW - 36, 44, Inset + 14);
+        header = Layer(0, 0, 0);
         header.Children.Add(who);
         header.Children.Add(timeText);
 
-        actions = Layer(OpenW - 28, 40, Inset + 72);
+        actions = Layer(0, 0, 0);
         actions.ColumnDefinitions.Add(new ColumnDefinition());
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
         actions.ColumnDefinitions.Add(new ColumnDefinition());
         var notYet = MakeButton("Not yet", Color.FromArgb(38, 255, 255, 255), Color.FromArgb(64, 255, 255, 255), Colors.White, () => Answer(false));
         var yes = MakeButton("Yes", Green, Color.FromRgb(76, 224, 112), Color.FromRgb(4, 40, 16), () => Answer(true));
         yesLabel = (TextBlock)yes.Child;
+        noLabel = (TextBlock)notYet.Child;
+        yesButton = yes;
+        noButton = notYet;
         Grid.SetColumn(yes, 2);
         actions.Children.Add(notYet);
         actions.Children.Add(yes);
@@ -170,9 +189,9 @@ class IslandWindow : GlassWindow
         var scale = new ScaleTransform(1, 1);
         var b = new Border
         {
-            Background = fill, CornerRadius = new CornerRadius(20), Cursor = Cursors.Hand,
+            Background = fill, Cursor = Cursors.Hand,
             RenderTransform = scale, RenderTransformOrigin = new Point(0.5, 0.5),
-            Child = new TextBlock { Text = label, FontSize = 14, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(ink), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            Child = new TextBlock { Text = label, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(ink), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
         };
         Action<double, int> press = (to, ms) =>
         {
@@ -223,7 +242,7 @@ class IslandWindow : GlassWindow
         Reveal(compact, 110);
         if (yes)
         {
-            smallIcon.Opacity = 0;
+            smallIcon.Opacity = smallLogo.Opacity = 0;
             check.Opacity = 1;
             Go(check, System.Windows.Shapes.Shape.StrokeDashOffsetProperty, 0, 360, Out, 180, null, 9);
         }
@@ -240,12 +259,17 @@ class IslandWindow : GlassWindow
         var accent = notice.Accent;
         detailText.Text = notice.Detail;
         yesLabel.Text = notice.YesLabel;
+        noLabel.Text = notice.NoLabel ?? "Not yet";
+        var size = notice.Small ? Small : Regular;
+        double extra = Fit(size);
         smallIcon.Data = bigIcon.Data = notice.Icon;
         smallIcon.Fill = bigIcon.Fill = new SolidColorBrush(accent);
         glow.Fill = new RadialGradientBrush(Color.FromArgb(120, accent.R, accent.G, accent.B), Color.FromArgb(0, accent.R, accent.G, accent.B));
         nameText.Text = compactLeft.Text = notice.Title;
         timeText.Text = compactRight.Text = notice.Time;
-        smallIcon.Opacity = 1;
+        smallLogo.Source = bigLogo.Source = notice.Logo;
+        smallLogo.Opacity = 1;
+        smallIcon.Opacity = bigIcon.Opacity = notice.Logo == null ? 1 : 0;
         check.Opacity = 0;
         SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13); // back on top of other topmost windows: NOSIZE | NOMOVE | NOACTIVATE
         CaptureBackdrop();
@@ -257,7 +281,7 @@ class IslandWindow : GlassWindow
         After(620, () =>
         {
             open = true;
-            Morph(OpenW, OpenH, OpenR);
+            Morph(size.Width, size.OpenH + extra, size.OpenR);
             Conceal(compact);
             Reveal(header, 70);
             Reveal(actions, 140);
@@ -267,6 +291,30 @@ class IslandWindow : GlassWindow
                 EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
             });
         });
+    }
+
+    // Sizes the open layout. Returns the extra height wrapped detail text needs (up to 3 lines).
+    double Fit(IslandSize s)
+    {
+        nameText.FontSize = timeText.FontSize = s.TitleFont;
+        nameText.MaxWidth = detailText.MaxWidth = s.TextW;
+        detailText.FontSize = s.DetailFont;
+        detailText.MaxHeight = 3 * s.LineH;
+        tile.Width = tile.Height = glow.Width = glow.Height = bigLogo.Width = bigLogo.Height = s.Tile;
+        tile.Margin = new Thickness(0, 0, s.Gap, 0);
+        bigLogo.Clip = new EllipseGeometry(new Point(s.Tile / 2, s.Tile / 2), s.Tile / 2, s.Tile / 2);
+        bigIcon.Width = bigIcon.Height = s.IconSize;
+        yesButton.CornerRadius = noButton.CornerRadius = new CornerRadius(s.ButtonH / 2);
+        yesLabel.FontSize = noLabel.FontSize = s.ButtonFont;
+        detailText.Measure(new Size(s.TextW, double.PositiveInfinity));
+        double extra = Math.Max(0, detailText.DesiredSize.Height - s.LineH);
+        header.Width = s.Width - 2 * s.Pad - 8;
+        header.Height = s.Tile + extra;
+        header.Margin = new Thickness(0, Inset + s.Pad, 0, 0);
+        actions.Width = s.Width - 2 * s.Pad;
+        actions.Height = s.ButtonH;
+        actions.Margin = new Thickness(0, Inset + 2 * s.Pad + s.Tile + extra, 0, 0);
+        return extra;
     }
 
     void Dismiss()

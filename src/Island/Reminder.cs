@@ -4,9 +4,11 @@ using System.Windows.Media;
 // What the island shows for one reminder.
 class IslandNotice
 {
-    public string Key, Title, Detail, Time, YesLabel;
+    public string Key, Title, Detail, Time, YesLabel, NoLabel; // a null NoLabel reads "Not yet"
     public Geometry Icon;
+    public ImageSource Logo; // replaces Icon when set
     public Color Accent;
+    public bool Small; // uses the smaller open island
     public System.Media.SoundPlayer Sound; // plays as the island appears; null uses IslandSound.Appear
 }
 
