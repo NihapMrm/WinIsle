@@ -105,7 +105,7 @@ partial class IslandWindow
             bool same = shown.Key == n.Key;
             // While dragging or scrolling, Windows' reports lag behind the bar; keep the pill's own value.
             if (same && (levelBar.IsMouseCaptured || DateTime.UtcNow - adjustedAt < TimeSpan.FromMilliseconds(500))) return;
-            if (!same && n.Sound != null) n.Sound.Play();
+            if (!same && n.Sound != null) IslandSound.Play(n.Sound);
             shown = n;
             FillCompact(n, same);
             return;
@@ -119,7 +119,7 @@ partial class IslandWindow
         FillCompact(n, false);
         SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13);
         CaptureBackdrop();
-        if (n.Sound != null) n.Sound.Play();
+        if (n.Sound != null) IslandSound.Play(n.Sound);
         Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2); Jump(y, 0);
         Morph(CompactW, CompactH, CompactH / 2);
         Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);

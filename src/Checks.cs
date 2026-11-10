@@ -30,7 +30,7 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + VolumeSettingFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + VolumeSettingFailures() + SoundSettingFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
     }
 
     // Flashes and watchers: the pure parts (names, levels, matching).
@@ -236,6 +236,33 @@ static class Checks
             if (VolumeWatcher.TakeKeys()) fails++; // no pill to show: Windows' own pop-up comes back
             Settings.Set(Settings.VolumeStep, 5);
             if (Math.Abs(VolumeWatcher.Step(0.50, true) - 0.55) > 1e-9 || Math.Abs(VolumeWatcher.Step(0.52, true) - 0.55) > 1e-9 || VolumeWatcher.Step(0.02, false) != 0) fails++;
+        }
+        catch (Exception) { fails++; }
+        finally { Settings.ResetAll(); }
+        return fails;
+    }
+
+    // Sound volume scales every sound's peak; the switches silence all sounds or one kind.
+    static int SoundSettingFailures()
+    {
+        int fails = 0;
+        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        Func<byte[], int> peak = wav => { int p = 0; for (int i = 44; i < wav.Length; i += 2) p = Math.Max(p, Math.Abs((int)BitConverter.ToInt16(wav, i))); return p; };
+        try
+        {
+            Settings.Set(Settings.SoundVolume, 50);
+            if (Math.Abs(peak(IslandSound.ChargeWav()) - 0.16 * short.MaxValue) > 2) fails++;
+            Settings.Set(Settings.SoundVolume, 100);
+            if (Math.Abs(peak(IslandSound.ChargeWav()) - 0.32 * short.MaxValue) > 2) fails++;
+            if (!IslandSound.Allowed(IslandSound.Alarm) || !IslandSound.Allowed(IslandSound.Tick)) fails++;
+            Settings.Set(Settings.SoundAlarms, false);
+            if (IslandSound.Allowed(IslandSound.Alarm) || !IslandSound.Allowed(IslandSound.Water)) fails++;
+            Settings.Set(Settings.SoundAlarms, true);
+            Settings.Set(Settings.SoundOn, false);
+            if (IslandSound.Allowed(IslandSound.Alarm) || IslandSound.Allowed(IslandSound.Notify) || IslandSound.Allowed(IslandSound.Charge)) fails++;
+            Settings.Set(Settings.SoundOn, true);
+            Settings.Set(Settings.SoundVolume, 0);
+            if (IslandSound.Allowed(IslandSound.Appear)) fails++;
         }
         catch (Exception) { fails++; }
         finally { Settings.ResetAll(); }

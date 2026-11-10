@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Media;
@@ -9,28 +10,64 @@ static class IslandSound
 {
     const int Rate = 44100;
 
-    public static readonly SoundPlayer Appear = Load(Wav(0.32, 800, 784, 0, 1175, 110));
-    public static readonly SoundPlayer Yes = Load(Wav(0.36, 850, 659, 0, 784, 90, 1047, 180));
-    public static readonly SoundPlayer NotYet = Load(Wav(0.24, 500, 587, 0, 440, 90));
+    // Declared before the players: static fields initialise in this order.
+    static readonly Dictionary<SoundPlayer, string> kinds = new Dictionary<SoundPlayer, string>();      // player -> its Control Center switch
+    static readonly Dictionary<SoundPlayer, Func<byte[]>> makers = new Dictionary<SoundPlayer, Func<byte[]>>(); // to rebuild at a new volume
+    static double builtGain = Gain;
+
+    public static readonly SoundPlayer Appear = Load(Settings.SoundReminders, () => Wav(0.32, 800, 784, 0, 1175, 110));
+    public static readonly SoundPlayer Yes = Load(Settings.SoundReminders, () => Wav(0.36, 850, 659, 0, 784, 90, 1047, 180));
+    public static readonly SoundPlayer NotYet = Load(Settings.SoundReminders, () => Wav(0.24, 500, 587, 0, 440, 90));
     // Plugging in the charger: a soft power-up glide, then a rising four-note chime.
-    public static readonly SoundPlayer Charge = Load(ChargeWav());
+    public static readonly SoundPlayer Charge = Load(Settings.SoundFlashes, ChargeWav);
     // Unplugging: the same voices going the other way, a little quieter: a falling glide, then two descending notes.
-    public static readonly SoundPlayer Unplug = Load(UnplugWav());
+    public static readonly SoundPlayer Unplug = Load(Settings.SoundFlashes, UnplugWav);
 
     // A short dry click for each step of the timer wheels.
-    public static readonly SoundPlayer Tick = Load(Mix(0.3, 30, new double[] { 3000, 0 }, (hz, t) => Math.Min(t / 0.0005, 1) * Math.Exp(-t * 350) * Math.Sin(2 * Math.PI * hz * t)));
+    public static readonly SoundPlayer Tick = Load(Settings.SoundTicks, () => Mix(0.3, 30, new double[] { 3000, 0 }, (hz, t) => Math.Min(t / 0.0005, 1) * Math.Exp(-t * 350) * Math.Sin(2 * Math.PI * hz * t)));
 
     // Alarm clock: four quick beeps then a pause, made to repeat with PlayLooping.
-    public static readonly SoundPlayer Alarm = Load(Beeps(0.5, 1200, 1319, 0, 1319, 160, 1319, 320, 1319, 480));
-    public static readonly SoundPlayer Notify =Load(Wav(0.26, 600, 1047, 0, 1319, 80));
-    public static readonly SoundPlayer Water =Load(Drops(0.4, 800, 900, 0, 1250, 170, 760, 340));
+    public static readonly SoundPlayer Alarm = Load(Settings.SoundAlarms, () => Beeps(0.5, 1200, 1319, 0, 1319, 160, 1319, 320, 1319, 480));
+    public static readonly SoundPlayer Notify = Load(Settings.SoundNotifications, () => Wav(0.26, 600, 1047, 0, 1319, 80));
+    public static readonly SoundPlayer Water = Load(Settings.SoundReminders, () => Drops(0.4, 800, 900, 0, 1250, 170, 760, 340));
 
-    static SoundPlayer Load(byte[] wav)
+    static IslandSound()
     {
-        var player = new SoundPlayer(new MemoryStream(wav));
+        // A new volume rebuilds every sound into the same players, so notices already holding one play it new.
+        Settings.Changed += () => { if (Gain != builtGain) Rebuild(); };
+    }
+
+    static SoundPlayer Load(string kind, Func<byte[]> make)
+    {
+        var player = new SoundPlayer(new MemoryStream(make()));
         player.Load();
+        kinds[player] = kind;
+        makers[player] = make;
         return player;
     }
+
+    // The Control Center's sound volume, 0..1, applied to every sound's peak.
+    internal static double Gain { get { return Settings.Num(Settings.SoundVolume) / 100; } }
+
+    internal static void Rebuild()
+    {
+        builtGain = Gain;
+        foreach (var m in makers)
+        {
+            m.Key.Stream = new MemoryStream(m.Value());
+            m.Key.Load();
+        }
+    }
+
+    // False when sounds are off, this kind of sound is off, or the volume is 0.
+    internal static bool Allowed(SoundPlayer player)
+    {
+        string kind;
+        return Settings.On(Settings.SoundOn) && Gain > 0 && (!kinds.TryGetValue(player, out kind) || Settings.On(kind));
+    }
+
+    internal static void Play(SoundPlayer player) { if (Allowed(player)) player.Play(); }
+    internal static void Loop(SoundPlayer player) { if (Allowed(player)) player.PlayLooping(); }
 
     // Each note is a soft bell: quick attack, exponential decay.
     internal static byte[] Wav(double peak, int ms, params double[] notes)
@@ -120,7 +157,7 @@ static class IslandSound
     // Scales to the peak volume (so it never clips) and writes a 16-bit mono WAV.
     static byte[] Encode(double[] mix, double peak)
     {
-        double scale = peak * short.MaxValue / mix.Max(x => Math.Abs(x));
+        double scale = peak * Gain * short.MaxValue / mix.Max(x => Math.Abs(x));
         double fade = Rate * 0.04; // the last 40 ms reach silence, so playback ends without a click
         using (var stream = new MemoryStream())
         using (var w = new BinaryWriter(stream))

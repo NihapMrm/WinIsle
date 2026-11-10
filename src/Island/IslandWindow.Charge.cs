@@ -110,7 +110,7 @@ partial class IslandWindow
 
         SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13);
         if (!takeOver) CaptureBackdrop(); // taking over keeps the glass already showing
-        sound.Play();
+        IslandSound.Play(sound);
         if (!takeOver) { Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2); Jump(y, 0); } // else morph from the alert's shape
         Morph(ChargeW, ChargeH, ChargeR);
         Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);

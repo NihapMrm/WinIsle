@@ -113,7 +113,7 @@ partial class IslandWindow
         {
             if (shelf == null) return;
             shelf.AutoScreenshots = !shelf.AutoScreenshots;
-            IslandSound.Tick.Play();
+            IslandSound.Play(IslandSound.Tick);
             show();
         };
         show();
@@ -252,7 +252,7 @@ partial class IslandWindow
         if (paths == null || shelf == null || draggingOut || !shelfOpen) return;
         e.Effects = DragDropEffects.Link;
         e.Handled = true;
-        if (shelf.Add(paths) > 0) IslandSound.Tick.Play();
+        if (shelf.Add(paths) > 0) IslandSound.Play(IslandSound.Tick);
         RefreshShelf();
         // After a drop the mouse may never "enter" again, so fold up by ourselves once it has moved away.
         After(1800, () => { if (shelfOpen && !IsMouseOver && !dragInside) ClosePlayer(); });

@@ -422,7 +422,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         if (!open) return;
         open = false;
         StopRinging();
-        (yes ? IslandSound.Yes : IslandSound.NotYet).Play();
+        IslandSound.Play(yes ? IslandSound.Yes : IslandSound.NotYet);
         glow.BeginAnimation(OpacityProperty, null);
         var result = reminders[shownIndex].Answer(shown, yes);
         confirmed = yes;
@@ -471,7 +471,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13); // back on top of other topmost windows: NOSIZE | NOMOVE | NOACTIVATE
         CaptureBackdrop();
         var sound = notice.Sound ?? IslandSound.Appear;
-        if (notice.LoopSound) { sound.PlayLooping(); ringing = sound; } else sound.Play();
+        if (notice.LoopSound) { IslandSound.Loop(sound); ringing = sound; } else IslandSound.Play(sound);
         Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2); Jump(y, 0);
         Morph(CompactW, CompactH, CompactH / 2);
         Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);
@@ -706,7 +706,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
                 picker.Children.Add(new TextBlock { Text = ":", FontSize = 24, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 4) });
             wheel.Stepped += () =>
             {
-                IslandSound.Tick.Play();
+                IslandSound.Play(IslandSound.Tick);
                 timer.Set(new TimeSpan(hoursWheel.Value, minutesWheel.Value, secondsWheel.Value));
                 RefreshTimer();
             };
