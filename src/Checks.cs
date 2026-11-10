@@ -53,6 +53,9 @@ static class Checks
         if (!ClipboardHistory.Matches(ClipItem.FromText("Hello World", t0), "world") || ClipboardHistory.Matches(ClipItem.FromText("Hello", t0), "xyz") || !ClipboardHistory.Matches(ClipItem.FromText("Hello", t0), " ")) fails++;
         if (!ClipboardHistory.Matches(new ClipItem { Files = new[] { @"C:\work\Report.pdf" } }, "report") || ClipboardHistory.Matches(new ClipItem { Files = new[] { @"C:\work\Report.pdf" } }, "work")) fails++;
         if (!ClipItem.FromText(" https://example.com/a ", t0).IsLink || ClipItem.FromText("see https://example.com", t0).IsLink) fails++;
+        // File previews: a real file gives a picture, a missing one gives null (shown as a plain tile), never a crash.
+        var explorer = Path.Combine(Environment.GetEnvironmentVariable("WINDIR"), "explorer.exe");
+        if (AppIcon.ForFile(explorer) == null || AppIcon.ForFile(@"C:\no\such\file.png") != null) fails++;
         if (ClipboardHistory.Ago(TimeSpan.FromSeconds(30)) != "now" || ClipboardHistory.Ago(TimeSpan.FromMinutes(5)) != "5m" || ClipboardHistory.Ago(TimeSpan.FromHours(3)) != "3h" || ClipboardHistory.Ago(TimeSpan.FromDays(2)) != "2d") fails++;
         return fails;
     }

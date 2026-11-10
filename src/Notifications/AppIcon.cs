@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
-// An app's icon from the Windows Shell, looked up by its app id the way the Start menu does.
+// Pictures from the Windows Shell: an app's icon by its app id (as the Start menu does), or a file's thumbnail.
 static class AppIcon
 {
     const string FactoryId = "bcc18b79-ba16-442f-80c4-8a59c30c463b";
@@ -30,17 +31,24 @@ static class AppIcon
     {
         ImageSource icon;
         if (Cache.TryGetValue(appId, out icon)) return icon;
-        return Cache[appId] = appId == "" ? null : Load(appId);
+        return Cache[appId] = appId == "" ? null : Load("shell:AppsFolder\\" + appId, 96, IconOnly);
     }
 
-    static ImageSource Load(string appId)
+    // A file's or folder's preview as Explorer shows it: a real thumbnail for pictures, videos and documents,
+    // otherwise its icon. Null when the path is gone. Not cached: the file can change between copies.
+    internal static ImageSource ForFile(string path)
+    {
+        return File.Exists(path) || Directory.Exists(path) ? Load(path, 128, 0) : null;
+    }
+
+    static ImageSource Load(string parsingName, int pixels, int flags)
     {
         try
         {
             IShellItemImageFactory item;
-            SHCreateItemFromParsingName("shell:AppsFolder\\" + appId, IntPtr.Zero, new Guid(FactoryId), out item);
+            SHCreateItemFromParsingName(parsingName, IntPtr.Zero, new Guid(FactoryId), out item);
             IntPtr handle;
-            if (item.GetImage(new PixelSize { Width = 96, Height = 96 }, IconOnly, out handle) != 0) return null;
+            if (item.GetImage(new PixelSize { Width = pixels, Height = pixels }, flags, out handle) != 0) return null;
             var image = Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
             DeleteObject(handle);
             image.Freeze();

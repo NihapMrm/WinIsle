@@ -18,6 +18,7 @@ class ClipItem
     public string Text;
     public BitmapSource Image;
     public string[] Files;
+    public ImageSource[] Thumbs; // previews of the first few files, taken when copied; null entries for missing files
     public DateTime Copied; // UTC
     public bool Pinned;
     public string Key;      // same key = same content, so copying it again moves it to the top
@@ -43,6 +44,7 @@ class ClipboardHistory
     [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 
     internal const int Keep = 60; // unpinned items; pinned ones are never dropped
+    internal const int MaxThumbs = 4; // file previews per item; the rest show as "+N"
     const int WM_CLIPBOARDUPDATE = 0x031D;
 
     readonly List<ClipItem> items = new List<ClipItem>();
@@ -182,7 +184,8 @@ class ClipboardHistory
         if (data.GetDataPresent(DataFormats.FileDrop))
         {
             var files = data.GetData(DataFormats.FileDrop) as string[];
-            if (files != null && files.Length > 0) return new ClipItem { Files = files, Key = "files:" + string.Join("|", files), Copied = now };
+            if (files != null && files.Length > 0)
+                return new ClipItem { Files = files, Thumbs = files.Take(MaxThumbs).Select(AppIcon.ForFile).ToArray(), Key = "files:" + string.Join("|", files), Copied = now };
         }
         if (data.GetDataPresent(DataFormats.UnicodeText))
         {

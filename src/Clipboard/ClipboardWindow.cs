@@ -255,6 +255,11 @@ class ClipboardWindow : GlassWindow
                 BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)), BorderThickness = new Thickness(1),
             });
         }
+        else if (item.Files != null)
+        {
+            middle.Children.Add(FileStrip(item));
+            middle.Children.Add(new TextBlock { Text = Preview(item), FontSize = 13, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 6, 0, 0) });
+        }
         else
         {
             middle.Children.Add(new TextBlock
@@ -285,6 +290,47 @@ class ClipboardWindow : GlassWindow
         view.MouseMove += (s, e) => { if (selected != index) Select(index, false); }; // only real mouse moves, not the list scrolling under it
         view.MouseLeftButtonUp += (s, e) => Paste(item);
         return new Row { Item = item, View = view, Fill = fill, Actions = actions };
+    }
+
+    // One file: a large preview shaped like the picture. Several: square tiles, then "+N".
+    static UIElement FileStrip(ClipItem item)
+    {
+        var strip = new StackPanel { Orientation = Orientation.Horizontal };
+        var thumbs = item.Thumbs ?? new ImageSource[0];
+        if (item.Files.Length == 1 && thumbs.Length == 1 && thumbs[0] != null)
+        {
+            var only = thumbs[0];
+            double aspect = only.Width / Math.Max(1, only.Height);
+            strip.Children.Add(Tile(only, Math.Max(58, Math.Min(240, 58 * aspect)), 58, Stretch.UniformToFill));
+            return strip;
+        }
+        foreach (var thumb in thumbs) strip.Children.Add(Tile(thumb, 52, 52, Stretch.Uniform));
+        int more = item.Files.Length - thumbs.Length;
+        if (more > 0)
+            strip.Children.Add(new Border
+            {
+                Width = 52, Height = 52, CornerRadius = new CornerRadius(8), Background = new SolidColorBrush(Color.FromArgb(24, 255, 255, 255)),
+                Child = new TextBlock { Text = "+" + more, FontSize = 14, FontWeight = FontWeights.SemiBold, Opacity = 0.75, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            });
+        return strip;
+    }
+
+    // A rounded preview tile; a missing file shows a plain document glyph.
+    static Border Tile(ImageSource image, double width, double height, Stretch stretch)
+    {
+        var tile = new Border
+        {
+            Width = width, Height = height, CornerRadius = new CornerRadius(8), Margin = new Thickness(0, 0, 6, 0),
+            Background = new SolidColorBrush(Color.FromArgb(18, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)), BorderThickness = new Thickness(1),
+        };
+        if (image == null)
+            tile.Child = new TextBlock { Text = "", FontFamily = Icons, FontSize = 18, Opacity = 0.6, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        else if (stretch == Stretch.UniformToFill)
+            tile.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill }; // fills the rounded corners
+        else
+            tile.Child = new Image { Source = image, Stretch = Stretch.Uniform, Margin = new Thickness(5) }; // icons keep their shape
+        return tile;
     }
 
     static Border IconButton(string glyph, string tip, Action click)
