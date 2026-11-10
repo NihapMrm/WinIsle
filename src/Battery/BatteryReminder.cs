@@ -16,7 +16,7 @@ class BatteryReminder : IReminder
 
     [DllImport("kernel32.dll")] static extern bool GetSystemPowerStatus(out SystemPowerStatus status);
 
-    static readonly Geometry BatteryShape = Geometry.Parse("M4,7 H17 A2,2 0 0 1 19,9 V15 A2,2 0 0 1 17,17 H4 A2,2 0 0 1 2,15 V9 A2,2 0 0 1 4,7 Z M20,10 H21 A1,1 0 0 1 22,11 V13 A1,1 0 0 1 21,14 H20 Z");
+    internal static readonly Geometry BatteryShape =Geometry.Parse("M4,7 H17 A2,2 0 0 1 19,9 V15 A2,2 0 0 1 17,17 H4 A2,2 0 0 1 2,15 V9 A2,2 0 0 1 4,7 Z M20,10 H21 A1,1 0 0 1 22,11 V13 A1,1 0 0 1 21,14 H20 Z");
     static readonly Color LowAccent = Color.FromRgb(217, 89, 38), FullAccent = Color.FromRgb(52, 199, 89);
 
     readonly Func<Power?> read;
@@ -27,7 +27,7 @@ class BatteryReminder : IReminder
     internal BatteryReminder(Func<Power?> read) { this.read = read; }
 
     // Null on a PC without a battery.
-    static Power? ReadSystem()
+    internal static Power? ReadSystem()
     {
         SystemPowerStatus s;
         if (!GetSystemPowerStatus(out s) || s.BatteryLifePercent > 100 || (s.BatteryFlag & 128) != 0) return null;

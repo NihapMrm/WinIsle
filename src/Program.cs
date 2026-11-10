@@ -25,6 +25,7 @@ static class Program
     }
 
     internal static ClipboardWindow ClipboardPanel; // Ctrl+Alt+V and the island's clipboard button
+    static VolumeWatcher volume; // Windows holds only a COM pointer, so the app keeps it alive
 
     internal static void StartReminders()
     {
@@ -33,6 +34,14 @@ static class Program
         Tracker.Load();
         // Highest priority first. New reminders are added here.
         var timer = new CountdownTimer();
-        new IslandWindow(MediaSession.Live(), timer, FileShelf.Live(), timer,new BatteryReminder(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live()).Show();
+        var island = new IslandWindow(MediaSession.Live(), timer, FileShelf.Live(), timer, new BatteryReminder(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live());
+        island.Show();
+        // Brief flashes and the camera / mic dots. Each watcher fails quietly where the PC lacks the hardware.
+        ChargeWatcher.Watch(island.Flash);
+        volume = VolumeWatcher.Watch(island.Dispatcher, island.Flash);
+        BrightnessWatcher.Watch(island.Dispatcher, island.Flash);
+        BluetoothWatcher.Watch(island.Dispatcher, island.Flash);
+        ScreenshotWatcher.Watch(island.Dispatcher, island.AddScreenshot);
+        PrivacyWatcher.Watch(island);
     }
 }

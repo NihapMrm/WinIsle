@@ -187,6 +187,15 @@ partial class IslandWindow
         };
     }
 
+    // A new screenshot (from ScreenshotWatcher): onto the shelf, with a flash showing its thumbnail.
+    internal void AddScreenshot(string path)
+    {
+        if (shelf == null || shelf.Add(new[] { path }) == 0) return;
+        var thumb = shelfThumbs[path] = AppIcon.ForFile(path);
+        if (shelfOpen) RefreshShelf();
+        Flash(new IslandNotice { Key = "screenshot", Title = "Added to shelf", Time = "Screenshot", Logo = thumb, Icon = ShelfIcon, Accent = ShelfAccent, Sound = IslandSound.Tick });
+    }
+
     // ---- dropping in ----
 
     void OnDrag(DragEventArgs e)

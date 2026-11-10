@@ -13,6 +13,8 @@ class IslandNotice
     public bool Sticky; // stays until a button is clicked, even over a higher-priority reminder
     public System.Media.SoundPlayer Sound; // plays as the island appears; null uses IslandSound.Appear
     public bool LoopSound; // Sound repeats until the island closes
+    public double? Level;  // flashes only: 0..1 shown as a bar in place of the title (volume, brightness, charge)
+    public Action<double> SetLevel; // flashes only: set when the bar can be dragged or scrolled to change the level
 }
 
 // The two labels of the compact pill after an answer.

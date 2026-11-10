@@ -12,6 +12,9 @@ static class IslandSound
     public static readonly SoundPlayer Appear = Load(Wav(0.32, 800, 784, 0, 1175, 110));
     public static readonly SoundPlayer Yes = Load(Wav(0.36, 850, 659, 0, 784, 90, 1047, 180));
     public static readonly SoundPlayer NotYet = Load(Wav(0.24, 500, 587, 0, 440, 90));
+    // Plugging in the charger: a bright rising pair.
+    public static readonly SoundPlayer Charge = Load(Wav(0.28, 650, 1047, 0, 1568, 110));
+
     // A short dry click for each step of the timer wheels.
     public static readonly SoundPlayer Tick = Load(Mix(0.3, 30, new double[] { 3000, 0 }, (hz, t) => Math.Min(t / 0.0005, 1) * Math.Exp(-t * 350) * Math.Sin(2 * Math.PI * hz * t)));
 

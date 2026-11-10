@@ -84,6 +84,7 @@ The island sits at the very top centre of the screen and changes shape with smoo
 | Idle | A thin glass line tucked into the top edge |
 | Timer running | A small pill showing the time left, for example `4:59` |
 | Shelf holding files | A small pill showing, for example, `3 files` |
+| Camera or microphone in use | A green dot (camera) or orange dot (microphone) inside the island at its right end. In the thin line only the part of the dot that fits shows; hover it to see which apps |
 
 **Hover** over the top centre to open the media player. From the player you can open the timer, clipboard, shelf and mirror. When a pill shows the shelf count, hovering opens the shelf instead.
 
@@ -92,6 +93,18 @@ The island sits at the very top centre of the screen and changes shape with smoo
 **Priority order** (highest first): timer alarm, battery, prayer, water, Windows notifications. A higher one replaces a lower one that is waiting, and the lower one comes back afterwards. Calls and the timer alarm stay until you answer them.
 
 While your mouse is on the island, or the mirror is open, reminders wait. Calls and the timer alarm do not wait.
+
+**Flashes** are brief messages without buttons. Each one shows for about 2 seconds:
+
+| Flash | When |
+|---|---|
+| **Charging** | You plug in the charger. A green bar fills to the battery level, with a chime |
+| **Volume** | Volume or mute changes from keys, the taskbar or an app. A bar shows the level; holding a key moves the bar smoothly |
+| **Brightness** | Built-in screen brightness changes, including automatic brightness |
+| **Bluetooth** | A device connects (with its battery level when Windows knows it) or disconnects |
+| **Screenshot** | A new screenshot is saved. It goes onto the [file shelf](#file-shelf), and the flash shows its thumbnail |
+
+Flashes never interrupt a reminder, an open panel, or the player while your mouse is on it. Windows' own volume and brightness pop-ups still appear too; Windows offers no way to turn them off.
 
 **Sounds:** each reminder plays a short sound. Water uses water drops. Battery and timer alarms loop an alarm-clock beep until you answer them or the condition is gone.
 
@@ -226,6 +239,8 @@ The shelf temporarily holds files while you work.
 - **Use:** each file shows its Explorer thumbnail and name. Click to open it. Drag a tile, or use **Drag all**, out to any folder or app.
 - **Copy or move:** Windows decides when you drop, exactly as when dragging from Explorer. Files that are moved away leave the shelf.
 - **Remove:** **×** on a tile removes it from the shelf. The bin clears the shelf. Your files are never deleted.
+- **Screenshots:** every new screenshot from Snipping Tool (`Win+Shift+S` or Print Screen) goes onto the shelf automatically, ready to drag into a chat or email. This needs Snipping Tool's **Automatically save screenshots** setting, which is on by default; it saves to `Pictures\Screenshots`.
+- Files deleted or moved elsewhere leave the shelf on their own within a second.
 - The shelf stores file paths, not copies, and remembers them after a restart.
 
 ---
@@ -278,6 +293,7 @@ To back up or move your data, copy this folder.
 - **Notifications:** the app reads the text of every Windows notification to show it on the island. Windows asks for, or already has, this permission under **Settings > Privacy & security > Notifications**. Nothing is saved or sent anywhere.
 - **Clipboard:** everything you copy is recorded, **including passwords** copied from password managers, by choice. Anyone at your PC can open the history with `Ctrl+Alt+V`. Remove sensitive items with `Del`. Pinned text is saved to disk as Base64, which is not encryption, so avoid pinning passwords.
 - **Camera:** used only while the mirror is open. Nothing is recorded.
+- **Camera and microphone dots:** read from the record Windows keeps for its own privacy indicator. MyTodo does not use the camera or microphone to do this.
 - **Screen:** the island and clipboard panel take a blurred snapshot of the screen behind them to draw their glass. It is kept only in memory and is never saved.
 - **Network:** the app makes no internet connections. Prayer times are calculated on your PC.
 
@@ -318,6 +334,7 @@ The self-checks cover:
 - notification merging, calls and banners
 - media timing
 - battery thresholds
+- flashes (charging, volume, brightness, Bluetooth battery matching, screenshots, camera/mic app names)
 - timer and wheels
 - clipboard history
 - file thumbnails
@@ -339,6 +356,7 @@ The self-checks cover:
 | Island sizes (regular and small) | `Regular`, `Small` in `src/Island/IslandWindow.cs` |
 | Play-icon optical centring | `PlayNudge` in `src/Island/IslandWindow.cs` |
 | Clipboard history size (60) | `Keep` in `src/Clipboard/ClipboardHistory.cs` |
+| How long a flash shows (2.2 s) | `FlashMs` in `src/Island/IslandWindow.Flash.cs` |
 
 Rebuild after any change.
 
@@ -359,7 +377,13 @@ src/
   Dashboard/DashboardWindow.cs  Shared widgets for dashboards
   Prayer/                     Prayer times, tracker, reminder, dashboard (settings, charts)
   Water/WaterReminder.cs
-  Battery/BatteryReminder.cs
+  Battery/
+    BatteryReminder.cs        Low / full battery alarm
+    ChargeWatcher.cs          Charging flash
+  Audio/VolumeWatcher.cs      Volume flash (Windows Core Audio)
+  Display/BrightnessWatcher.cs  Brightness flash (WMI)
+  Bluetooth/BluetoothWatcher.cs Bluetooth connect / disconnect flash with battery
+  Privacy/PrivacyWatcher.cs   Camera / microphone in-use dots
   Notifications/
     WindowsNotifications.cs   Reads Windows notifications, hides banners, detects calls
     AppIcon.cs                App icons and file thumbnails from the Windows Shell
@@ -371,11 +395,14 @@ src/
   Clipboard/
     ClipboardHistory.cs       Records clipboard changes, pins, pasting
     ClipboardWindow.cs        Clipboard panel
-  Shelf/FileShelf.cs          Files held on the shelf
+  Shelf/
+    FileShelf.cs              Files held on the shelf
+    ScreenshotWatcher.cs      New screenshots onto the shelf
   Island/
     Reminder.cs               IReminder contract and IslandNotice
     IslandWindow.cs           The island: shapes, reminders, player, mirror, timer
     IslandWindow.Shelf.cs     The island's file shelf
+    IslandWindow.Flash.cs     Flashes and the camera / microphone dots
     IslandSound.cs            Generated sounds
 ```
 
@@ -400,6 +427,8 @@ src/
 | Mirror says camera access is off | **Settings > Privacy & security > Camera** > turn on **Let desktop apps access your camera** |
 | Clipboard paste does nothing in one app | That app may run as administrator. The item is still on the clipboard; press `Ctrl+V` yourself |
 | A prayer time is a minute or two off your mosque's timetable | Adjust `Offset` (see [Tuning](#tuning)) |
+| Screenshots don't go onto the shelf | In Snipping Tool settings, turn on **Automatically save screenshots**, then restart MyTodo (it watches `Pictures\Screenshots`) |
+| Brightness flash appears by itself | Automatic (adaptive) brightness is changing it; that counts as a change |
 | Shift a prayer that the PC was off for | Open the dashboard and click that prayer's cell to correct it |
 
 ---
@@ -412,3 +441,5 @@ src/
 - The water timer, a running countdown timer and unpinned clipboard history reset when the app restarts.
 - The thin top-edge peek also shows over full-screen videos and games.
 - Windows notifications and media are checked once a second, which uses a little CPU continuously.
+- Windows' own volume and brightness pop-ups can't be turned off, so both appear.
+- Bluetooth mice and keyboards that reconnect after sleep also flash. Battery level is known only for devices Windows shows a battery for in Settings.

@@ -174,6 +174,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         var left = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(16, 0, 0, 0), HorizontalAlignment = HorizontalAlignment.Left };
         left.Children.Add(iconSlot);
         left.Children.Add(compactLeft);
+        left.Children.Add(BuildLevelBar());
         compact = Layer(CompactW, CompactH, Inset);
         compact.Children.Add(left);
         compact.Children.Add(compactRight);
@@ -235,6 +236,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         timerPeek.Children.Add(peekRow);
         content.Children.Add(timerPeek);
         content.Children.Add(InitShelf());
+        content.Children.Add(BuildInUseDots()); // inside the island, at its right end
         var glass = new Grid { Width = WinW, Height = WinH, Clip = clip }; // clip outside the blur so the edge stays crisp
         glass.Children.Add(backdrop);
         stage.Children.Add(glass);
@@ -454,6 +456,8 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         smallIcon.Data = bigIcon.Data = notice.Icon;
         smallIcon.Fill = bigIcon.Fill = new SolidColorBrush(accent);
         glow.Fill = new RadialGradientBrush(Color.FromArgb(120, accent.R, accent.G, accent.B), Color.FromArgb(0, accent.R, accent.G, accent.B));
+        levelBar.Visibility = Visibility.Collapsed; // only flashes have a level
+        inUseDots.Visibility = Visibility.Hidden;   // the dots come back with the peek
         nameText.Text = compactLeft.Text = notice.Title;
         timeText.Text = compactRight.Text = notice.Time;
         smallLogo.Source = bigLogo.Source = notice.Logo;
@@ -555,6 +559,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         if (!mediaShown) ShowPeek();
         Fill(media.Now ?? Idle);
         if (timerOpen) RefreshTimer();
+        if (shelf != null) shelf.Prune(); // files deleted or moved elsewhere leave the shelf and its count
         if (!mediaOpen && WantPill() != timerPeekShown) RestPeek(); // a timer started or ended, or the shelf filled or emptied
         if (timerPeekShown) FillPill();
     }
@@ -908,5 +913,6 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         pill.Margin = new Thickness(0, Inset + y.X, 0, 0);
         clip.Rect = new Rect((WinW - w.X) / 2, Inset + y.X, w.X, h.X);
         clip.RadiusX = clip.RadiusY = r.X;
+        PlaceDots();
     }
 }

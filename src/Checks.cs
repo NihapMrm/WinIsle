@@ -30,7 +30,38 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures();
+    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    }
+
+    // Flashes and watchers: the pure parts (names, levels, matching).
+    static int WatcherFailures()
+    {
+        int fails = 0;
+        if (PrivacyWatcher.Friendly(@"C:#Program Files#Zoom#bin#Zoom.exe") != "Zoom" || PrivacyWatcher.Friendly("Microsoft.WindowsCamera_8wekyb3d8bbwe") != "WindowsCamera") fails++;
+        // In use = started, not stopped, and (for desktop apps) still running: a closed app's stale record doesn't count.
+        Func<string, bool> onlyZoom = name => name == "Zoom";
+        const string zoom = @"C:#Program Files#Zoom#bin#Zoom.exe", powerpoint = @"C:#Program Files#Microsoft Office#root#Office16#POWERPNT.EXE";
+        if (!PrivacyWatcher.Active(zoom, 5, 0, onlyZoom) || PrivacyWatcher.Active(powerpoint, 5, 0, onlyZoom)) fails++;
+        if (PrivacyWatcher.Active(zoom, 5, 9, onlyZoom) || PrivacyWatcher.Active(zoom, null, 0, onlyZoom)) fails++;
+        if (!PrivacyWatcher.Active("Microsoft.WindowsCamera_8wekyb3d8bbwe", 5, 0, onlyZoom)) fails++; // Store apps: Windows keeps these right
+        var charge = ChargeWatcher.Notice(82);
+        if (charge.Level != 0.82 || charge.Time != "82%" || charge.Key != "charging") fails++;
+        var loud = VolumeWatcher.Notice(0.65f, false);
+        var mute = VolumeWatcher.Notice(0.65f, true);
+        if (loud.Time != "65%" || Math.Abs(loud.Level.Value - 0.65) > 0.001 || mute.Time != "Muted" || mute.Level != 0 || loud.Key != mute.Key) fails++;
+        if (BrightnessWatcher.Notice(40).Level != 0.4) fails++;
+        // Volume keys handled here: 2% steps like Windows, snapping to the 2% grid, stopping at 0 and 100%.
+        if (Math.Abs(VolumeWatcher.Step(0.12, true) - 0.14) > 1e-9 || Math.Abs(VolumeWatcher.Step(0.131, false) - 0.12) > 1e-9) fails++;
+        if (VolumeWatcher.Step(1, true) != 1 || VolumeWatcher.Step(0, false) != 0 || Math.Abs(VolumeWatcher.Step(0.99, true) - 1) > 1e-9) fails++;
+        var nodes = new[]
+        {
+            new System.Collections.Generic.KeyValuePair<string, object>("OPPO F19 Pro Hands-Free HF", null),
+            new System.Collections.Generic.KeyValuePair<string, object>("Redmi Note 13 Hands-Free HF", (byte)20),
+        };
+        if (BluetoothWatcher.BatteryFor("Redmi Note 13", nodes) != 20 || BluetoothWatcher.BatteryFor("OPPO F19 Pro", nodes) != null || BluetoothWatcher.BatteryFor("Pixel", nodes) != null) fails++;
+        if (BluetoothWatcher.Notice("Buds", true, 60).Time != "60%" || BluetoothWatcher.Notice("Buds", true, null).Time != "Connected" || BluetoothWatcher.Notice("Buds", false, null).Time != "Disconnected") fails++;
+        if (!ScreenshotWatcher.IsPicture(@"C:\x\Screenshot 2026.PNG") || ScreenshotWatcher.IsPicture(@"C:\x\notes.txt")) fails++;
+        return fails;
     }
 
     // Shelf: holds each file once, survives a restart, and drops files that were moved or deleted.
