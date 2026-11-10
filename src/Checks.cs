@@ -30,7 +30,7 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    return fails + SettingsFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
     }
 
     // Flashes and watchers: the pure parts (names, levels, matching).
@@ -74,6 +74,57 @@ static class Checks
         return fails;
     }
 
+    // Settings: round-trip, clamping, damaged files, the shelf migration, Changed. Never touches the real file.
+    static int SettingsFailures()
+    {
+        int fails = 0;
+        var root = Path.Combine(Path.GetTempPath(), "MyTodoSettings" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        string path = Path.Combine(root, "settings.txt");
+        try
+        {
+            Settings.Load(path);
+            if (Settings.Num(Settings.FlashSeconds) != 2.2 || Settings.Text(Settings.LastPage) != "General" || !Settings.On(Settings.WaterOn)) fails++; // missing file: defaults
+            int changed = 0;
+            Action count = () => changed++;
+            Settings.Changed += count;
+            Settings.Set(Settings.WaterEvery, 30);
+            Settings.Set(Settings.Hanafi, true);
+            Settings.Set(Settings.CallWords, "ring");
+            Settings.Changed -= count;
+            if (changed != 3) fails++;
+            Settings.Load(path);
+            if (Settings.Num(Settings.WaterEvery) != 30 || !Settings.On(Settings.Hanafi) || Settings.Text(Settings.CallWords) != "ring") fails++; // round-trip
+            Settings.Set(Settings.BatteryLow, 999);
+            Settings.Set(Settings.WaterEvery, 1);
+            if (Settings.Num(Settings.BatteryLow) != 50 || Settings.Num(Settings.WaterEvery) != 15) fails++; // clamped
+            if (Settings.Min(Settings.WaterEvery) != 15 || Settings.Max(Settings.WaterEvery) != 480) fails++;
+
+            File.WriteAllText(path, "garbage\nwater.every=abc\nbattery.low=999\nwater.on=maybe\n=\nprayer.offset.2=5\nprayer.offset.2=7");
+            Settings.Load(path);
+            if (Settings.Num(Settings.WaterEvery) != 90 || Settings.Num(Settings.BatteryLow) != 50 || !Settings.On(Settings.WaterOn) || Settings.Num(Settings.PrayerOffset(2)) != 7) fails++;
+            File.WriteAllText(path, "");
+            Settings.Load(path);
+            if (Settings.Num(Settings.FlashSeconds) != 2.2 || Settings.Text(Settings.LastPage) != "General") fails++;
+
+            // An older shelf-settings.txt carries over once.
+            var old = Path.Combine(root, "migrate");
+            Directory.CreateDirectory(old);
+            File.WriteAllText(Path.Combine(old, "shelf-settings.txt"), "screenshots=on");
+            Settings.Load(Path.Combine(old, "settings.txt"));
+            if (!Settings.On(Settings.Screenshots)) fails++;
+            Settings.ResetAll();
+            if (Settings.On(Settings.Screenshots) || Settings.Num(Settings.WaterEvery) != 90) fails++;
+        }
+        catch (Exception) { fails++; }
+        finally
+        {
+            Settings.Load(Path.Combine(root, "none", "settings.txt")); // later checks see defaults
+            Directory.Delete(root, true);
+        }
+        return fails;
+    }
+
     // Shelf: holds each file once, survives a restart, and drops files that were moved or deleted.
     static int ShelfFailures()
     {
@@ -97,13 +148,12 @@ static class Checks
             shelf.Clear();
             if (new FileShelf(list).Count != 0 || !File.Exists(a)) fails++;   // clearing never touches the files
 
-            // Screenshot switch: off at first, remembered when switched on, and off again when switched off.
-            string settings = Path.Combine(root, "shelf-settings.txt");
-            if (new FileShelf(list, settings).AutoScreenshots) fails++;
-            new FileShelf(list, settings).AutoScreenshots = true;
-            if (!new FileShelf(list, settings).AutoScreenshots) fails++;
-            new FileShelf(list, settings).AutoScreenshots = false;
-            if (new FileShelf(list, settings).AutoScreenshots) fails++;
+            // Screenshot switch: the Control Center's setting, so the shelf header and the Control Center agree.
+            if (new FileShelf(list).AutoScreenshots) fails++;
+            Settings.Set(Settings.Screenshots, true);
+            if (!new FileShelf(list).AutoScreenshots) fails++;
+            new FileShelf(list).AutoScreenshots = false;
+            if (Settings.On(Settings.Screenshots)) fails++;
         }
         finally { Directory.Delete(root, true); }
         return fails;

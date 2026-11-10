@@ -74,6 +74,7 @@ static class Program
 
     internal static void StartReminders()
     {
+        Settings.Load(); // first: every feature below reads it
         var clipboard = ClipboardHistory.Live();
         ClipboardPanel = new ClipboardWindow(clipboard);
         Prayers.LoadSettings();
