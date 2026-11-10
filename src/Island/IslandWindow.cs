@@ -33,12 +33,14 @@ class IslandWindow : GlassWindow
     // Media: a pill tucked above the screen edge with PeekShown px showing, opening into a player on hover.
     const double PeekW = 150, PeekH = 20, PeekShown = 6, PeekTop = PeekShown - Inset - PeekH, GoneTop = -(Inset + PeekH + 4);
     const double MediaW = 380, MediaH = 160, MediaR = 30, MediaPad = 14;
+    const double MirrorW = 360, MirrorH = 270, MirrorR = 28; // 4:3, the camera's shape
 
     static readonly MediaInfo Idle = new MediaInfo { Title = "Nothing playing", Artist = "", AppId = "" };
     static readonly Geometry PlayIcon =Geometry.Parse("M7,4.5 L19.5,12 L7,19.5 Z");
     static readonly Geometry PauseIcon = Geometry.Parse("M6.5,4.5 H10 V19.5 H6.5 Z M14,4.5 H17.5 V19.5 H14 Z");
     static readonly Geometry PreviousIcon = Geometry.Parse("M6,5 H8 V19 H6 Z M19,5 L9.5,12 L19,19 Z");
     static readonly Geometry NextIcon = Geometry.Parse("M16,5 H18 V19 H16 Z M5,5 L14.5,12 L5,19 Z");
+    static readonly Geometry MirrorIcon = Geometry.Parse("F0 M12,2 A6.5,8 0 1 1 11.99,2 Z M12,4 A4.5,6 0 1 1 11.99,4 Z M11,18 H13 V20.5 H11 Z M8,20.5 H16 V22 H8 Z");
 
     // The open island's dimensions. Corner radius = button radius + padding, so the curves are concentric.
     internal class IslandSize
@@ -92,6 +94,14 @@ class IslandWindow : GlassWindow
     byte[] artBytes;      // whose image art shows
     bool mediaShown;      // peek or player is on screen
     bool mediaOpen;       // the player is open under the mouse
+
+    // Mirror: the camera, flipped, filling the island.
+    readonly Image mirrorImage = new Image { Stretch = Stretch.UniformToFill, RenderTransform = new ScaleTransform(-1, 1), RenderTransformOrigin = new Point(0.5, 0.5) };
+    readonly TextBlock mirrorText = new TextBlock { FontSize = 13, Opacity = 0.8, TextAlignment = TextAlignment.Center, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(24, 0, 24, 0), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    Grid mirrorLayer;
+    WriteableBitmap mirrorBitmap;
+    Camera camera;
+    bool mirrorOn;        // the island is a mirror and the camera is on
 
     IntPtr hwnd;
     double dpi = 1;
@@ -181,12 +191,19 @@ class IslandWindow : GlassWindow
         actions.Children.Add(yes);
 
         mediaLayer = BuildPlayer();
+        mirrorLayer = Layer(MirrorW, MirrorH, 0); // starts at the screen edge, like the player
+        mirrorLayer.Background = Brushes.Black;
+        mirrorLayer.Cursor = Cursors.Hand;
+        mirrorLayer.Children.Add(mirrorImage);
+        mirrorLayer.Children.Add(mirrorText);
+        mirrorLayer.MouseLeftButtonUp += (s, e) => CloseMirror(); // click the mirror to turn the camera off
 
         var content = new Grid { Width = WinW, Height = WinH, Clip = clip };
         content.Children.Add(compact);
         content.Children.Add(header);
         content.Children.Add(actions);
         content.Children.Add(mediaLayer);
+        content.Children.Add(mirrorLayer);
         var glass = new Grid { Width = WinW, Height = WinH, Clip = clip }; // clip outside the blur so the edge stays crisp
         glass.Children.Add(backdrop);
         stage.Children.Add(glass);
@@ -196,7 +213,7 @@ class IslandWindow : GlassWindow
 
         // Hovering the peek opens the player; leaving puts it back.
         MouseEnter += (s, e) => { if (shown == null && mediaShown && !mediaOpen) OpenPlayer(); };
-        MouseLeave += (s, e) => After(350, () => { if (mediaOpen && !IsMouseOver) ClosePlayer(); });
+        MouseLeave += (s, e) => After(350, () => { if (mediaOpen && !mirrorOn && !IsMouseOver) ClosePlayer(); }); // the mirror stays until clicked
 
         SourceInitialized += (s, e) =>
         {
@@ -312,7 +329,12 @@ class IslandWindow : GlassWindow
         controls.Children.Add(RoundButton(Glyph(PreviousIcon), 36, clear, dim, () => media.Previous()));
         controls.Children.Add(play);
         controls.Children.Add(RoundButton(Glyph(NextIcon), 36, clear, dim, () => media.Next()));
-        column.Children.Add(controls);
+        var controlsRow = new Grid { Height = 40 };
+        controlsRow.Children.Add(controls);
+        var mirror = RoundButton(Glyph(MirrorIcon), 34, clear, dim, OpenMirror);
+        mirror.HorizontalAlignment = HorizontalAlignment.Right;
+        controlsRow.Children.Add(mirror);
+        column.Children.Add(controlsRow);
 
         layer.Children.Add(column);
         return layer;
@@ -336,8 +358,8 @@ class IslandWindow : GlassWindow
             if ((due != null && dueIndex < shownIndex && !shown.Sticky) || !reminders[shownIndex].StillCurrent(shown)) Dismiss();
             return;
         }
-        // Reminders wait while the player is open under the mouse; calls don't.
-        if (due != null && (!mediaOpen || due.Sticky))
+        // Reminders wait while the player or mirror is open; calls don't.
+        if (due != null && (!(mediaOpen || mirrorOn) || due.Sticky))
         {
             if (mediaShown) HidePlayer();
             Present(due, dueIndex);
@@ -498,9 +520,57 @@ class IslandWindow : GlassWindow
         mediaOpen = true;
         CaptureBackdrop();
         if (mediaNow != null) Fill(mediaNow);
-        // Flush with the screen's top edge: the top corners sit above the screen, so the player hangs from the lid.
-        Morph(MediaW, MediaH + MediaR, MediaR, -Inset - MediaR);
+        HangFromLid(MediaW, MediaH, MediaR);
         Reveal(mediaLayer, 120);
+    }
+
+    // Flush with the screen's top edge: the top corners sit above the screen, so the island hangs from the lid.
+    void HangFromLid(double width, double height, double radius)
+    {
+        Morph(width, height + radius, radius, -Inset - radius);
+    }
+
+    void OpenMirror()
+    {
+        if (mirrorOn || !mediaOpen) return;
+        mirrorOn = true;
+        mirrorText.Text = "Starting camera…";
+        mirrorText.Opacity = 0.8;
+        Conceal(mediaLayer);
+        HangFromLid(MirrorW, MirrorH, MirrorR);
+        Reveal(mirrorLayer, 120);
+        var mine = Camera.Start(Dispatcher, ShowFrame, message => { if (mirrorOn) mirrorText.Text = message; });
+        camera = mine;
+    }
+
+    void ShowFrame(byte[] pixels, int width, int height)
+    {
+        if (!mirrorOn) return;
+        if (mirrorBitmap == null || mirrorBitmap.PixelWidth != width || mirrorBitmap.PixelHeight != height)
+        {
+            mirrorBitmap = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr32, null);
+            mirrorImage.Source = mirrorBitmap;
+            mirrorText.Opacity = 0;
+        }
+        mirrorBitmap.WritePixels(new Int32Rect(0, 0, width, height), pixels, width * 4, 0);
+    }
+
+    // Turns the camera off, then goes back to the player if the mouse is still there.
+    void CloseMirror()
+    {
+        if (!mirrorOn) return;
+        mirrorOn = false;
+        camera.Stop();
+        camera = null;
+        Conceal(mirrorLayer);
+        mirrorImage.Source = null;
+        mirrorBitmap = null;
+        if (IsMouseOver && mediaShown)
+        {
+            HangFromLid(MediaW, MediaH, MediaR);
+            Reveal(mediaLayer, 120);
+        }
+        else ClosePlayer();
     }
 
     void ClosePlayer()
@@ -513,6 +583,7 @@ class IslandWindow : GlassWindow
     // Makes way for a reminder; the peek slides back in once it's gone.
     void HidePlayer()
     {
+        if (mirrorOn) { mirrorOn = false; camera.Stop(); camera = null; mirrorImage.Source = null; mirrorBitmap = null; Conceal(mirrorLayer); }
         mediaShown = mediaOpen = false;
         Conceal(mediaLayer);
         stage.BeginAnimation(OpacityProperty, null);
