@@ -54,15 +54,14 @@ class TodoPanel : GlassWindow
         count.HorizontalAlignment = HorizontalAlignment.Right;
         count.VerticalAlignment = VerticalAlignment.Center;
         count.Opacity = 0.55;
-        count.Margin = new Thickness(0, 0, 32, 0);
+        count.Margin = new Thickness(0, 0, 62, 0);
         header.Children.Add(count);
-        var prayersFill = new SolidColorBrush(Colors.Transparent);
-        var prayersButton = new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Background = prayersFill, Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Right, ToolTip = "Prayer dashboard (Ctrl+Alt+P)", Child = PrayerReminder.Moon(15) };
-        prayersButton.MouseEnter += (s, e) => Anim(prayersFill, Color.FromArgb(40, 255, 255, 255));
-        prayersButton.MouseLeave += (s, e) => Anim(prayersFill, Colors.Transparent);
-        prayersButton.MouseLeftButtonDown += (s, e) => e.Handled = true; // don't start window drag
-        prayersButton.MouseLeftButtonUp += (s, e) => OpenDashboard();
+        var prayersButton = HeaderButton(PrayerReminder.Moon(15), "Prayer dashboard (Ctrl+Alt+P)", OpenDashboard);
+        prayersButton.Margin = new Thickness(0, 0, 30, 0);
         header.Children.Add(prayersButton);
+        // Close only hides the panel, so the reminders keep running; Ctrl+Alt+T brings it back.
+        var closeGlyph = new TextBlock { Text = "", FontFamily = Icons, FontSize = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        header.Children.Add(HeaderButton(closeGlyph, "Close (Ctrl+Alt+T to open)", HidePanel));
 
         // Input with placeholder
         var placeholder = new TextBlock { Text = "Add a task…", Opacity = 0.45, IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 0, 0) };
@@ -140,6 +139,18 @@ class TodoPanel : GlassWindow
         SourceInitialized += (s, e) => InitNative();
         Loaded += (s, e) => ShowPanel();
         Closing += (s, e) => SavePosition();
+    }
+
+    // Round 26 px icon button for the header's right side.
+    static Border HeaderButton(UIElement icon, string tip, Action click)
+    {
+        var fill = new SolidColorBrush(Colors.Transparent);
+        var b = new Border { Width = 26, Height = 26, CornerRadius = new CornerRadius(13), Background = fill, Cursor = Cursors.Hand, HorizontalAlignment = HorizontalAlignment.Right, ToolTip = tip, Child = icon };
+        b.MouseEnter += (s, e) => Anim(fill, Color.FromArgb(40, 255, 255, 255));
+        b.MouseLeave += (s, e) => Anim(fill, Colors.Transparent);
+        b.MouseLeftButtonDown += (s, e) => e.Handled = true; // don't start window drag
+        b.MouseLeftButtonUp += (s, e) => click();
+        return b;
     }
 
     void InitNative()
