@@ -28,6 +28,7 @@ partial class IslandWindow
     readonly TextBlock chargeTitle = new TextBlock { Text = "Charging", FontSize = 14, FontWeight = FontWeights.SemiBold };
     Grid chargeLayer;
     bool charging; // the charging animation is on the island
+    int powerGen;  // which plug-in / unplug animation is current; an older one's live count stops
 
     Grid BuildCharge()
     {
@@ -93,6 +94,7 @@ partial class IslandWindow
         else if (mediaShown) HidePlayer();
         inUseDots.Visibility = Visibility.Hidden;
         flashing = charging = true;
+        powerGen++; // a count-up still running from the previous animation stops on its next tick
         shown = new IslandNotice { Key = "charging" }; // holds the island like any flash until it times out
         open = confirmed = false;
         flashUntil = DateTime.UtcNow.AddMilliseconds(ChargeMs);
@@ -208,6 +210,7 @@ partial class IslandWindow
     // report them, it shows the whole-number percent and holds still.
     void CountUp(int percent, int delayMs, int durationMs)
     {
+        int gen = powerGen; // the animation this count belongs to
         var start = DateTime.UtcNow.AddMilliseconds(delayMs);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
         double level = percent, perSec = 0; // the level at levelAt, and how fast it rises (% per second)
@@ -219,7 +222,7 @@ partial class IslandWindow
         var tick = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
         tick.Tick += (s, e) =>
         {
-            if (!charging) { tick.Stop(); return; }
+            if (!charging || gen != powerGen) { tick.Stop(); return; }
             var at = DateTime.UtcNow;
             if (!reading && (at - lastRead).TotalSeconds >= 1)
             {
@@ -232,7 +235,7 @@ partial class IslandWindow
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         reading = false;
-                        if (!ok || !charging) return;
+                        if (!ok || !charging || gen != powerGen) return;
                         var landed = DateTime.UtcNow;
                         // The driver's capacity updates in steps, so never let a stale read pull the number back.
                         level = exact ? Math.Max(p, now(landed)) : p;
