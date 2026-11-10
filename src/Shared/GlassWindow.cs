@@ -66,6 +66,22 @@ abstract class GlassWindow : Window
         target.BeginAnimation(p, a);
     }
 
+    [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr obj);
+
+    // A copy of the screen under a rectangle (in device-independent units), for windows that fake glass by
+    // blurring it: DWM acrylic can't be shaped. Layered windows, like ours, are left out of the copy.
+    protected static System.Windows.Media.Imaging.BitmapSource Snapshot(double left, double top, double width, double height, double dpi)
+    {
+        using (var bmp = new System.Drawing.Bitmap((int)(width * dpi), (int)(height * dpi), System.Drawing.Imaging.PixelFormat.Format24bppRgb))
+        {
+            using (var g = System.Drawing.Graphics.FromImage(bmp))
+                g.CopyFromScreen((int)(left * dpi), (int)(top * dpi), 0, 0, bmp.Size);
+            var handle = bmp.GetHbitmap();
+            try { return Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions()); }
+            finally { DeleteObject(handle); }
+        }
+    }
+
     protected static void After(int ms, Action action)
     {
         var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(ms) };

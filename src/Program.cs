@@ -24,8 +24,11 @@ static class Program
         app.Run(island);
     }
 
+    internal static ClipboardWindow ClipboardPanel; // Ctrl+Alt+V and the island's clipboard button
+
     internal static void StartReminders()
     {
+        ClipboardPanel = new ClipboardWindow(ClipboardHistory.Live());
         Prayers.LoadSettings();
         Tracker.Load();
         // Highest priority first. New reminders are added here.

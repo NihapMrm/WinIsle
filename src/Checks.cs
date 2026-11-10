@@ -30,7 +30,31 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures();
+    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures();
+    }
+
+    // Clipboard: copying again moves to the top, pins stay first and are never trimmed, search and ages read right.
+    static int ClipboardFailures()
+    {
+        int fails = 0;
+        var t0 = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var history = new ClipboardHistory(); // no pin file: checks never touch the real one
+        history.Add(ClipItem.FromText("alpha", t0));
+        history.Add(ClipItem.FromText("beta", t0.AddSeconds(1)));
+        history.Add(ClipItem.FromText("alpha", t0.AddSeconds(2)));
+        var items = history.Items;
+        if (items.Count != 2 || items[0].Text != "alpha") fails++;
+        history.TogglePin(items[1]);
+        if (history.Items[0].Text != "beta" || !history.Items[0].Pinned) fails++;
+        for (int i = 0; i < ClipboardHistory.Keep + 10; i++) history.Add(ClipItem.FromText("n" + i, t0.AddMinutes(i + 1)));
+        var all = history.Items;
+        if (all.Count != ClipboardHistory.Keep + 1 || all[0].Text != "beta" || all.Any(x => x.Text == "alpha")) fails++;
+
+        if (!ClipboardHistory.Matches(ClipItem.FromText("Hello World", t0), "world") || ClipboardHistory.Matches(ClipItem.FromText("Hello", t0), "xyz") || !ClipboardHistory.Matches(ClipItem.FromText("Hello", t0), " ")) fails++;
+        if (!ClipboardHistory.Matches(new ClipItem { Files = new[] { @"C:\work\Report.pdf" } }, "report") || ClipboardHistory.Matches(new ClipItem { Files = new[] { @"C:\work\Report.pdf" } }, "work")) fails++;
+        if (!ClipItem.FromText(" https://example.com/a ", t0).IsLink || ClipItem.FromText("see https://example.com", t0).IsLink) fails++;
+        if (ClipboardHistory.Ago(TimeSpan.FromSeconds(30)) != "now" || ClipboardHistory.Ago(TimeSpan.FromMinutes(5)) != "5m" || ClipboardHistory.Ago(TimeSpan.FromHours(3)) != "3h" || ClipboardHistory.Ago(TimeSpan.FromDays(2)) != "2d") fails++;
+        return fails;
     }
 
     // Timer: counts down, pauses and resumes exactly, rings at zero, and only a stopped timer can be changed.

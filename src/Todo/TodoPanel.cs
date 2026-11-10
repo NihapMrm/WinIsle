@@ -1,4 +1,5 @@
 // Always-on-top glass todo panel. Ctrl+Alt+T toggles, Esc / Ctrl+Q hide, Ctrl+Shift+Q quits.
+// Also owns the app's hotkeys: Ctrl+Alt+P prayer dashboard, Ctrl+Alt+V clipboard history.
 // Build: build.cmd (uses the .NET Framework csc.exe that ships with Windows, C# 5).
 using System;
 using System.IO;
@@ -18,7 +19,7 @@ class TodoPanel : GlassWindow
     [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr hwnd, int id, uint mods, uint vk);
 
     const int WM_HOTKEY = 0x0312;
-    const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_NOREPEAT = 0x4000, VK_T = 0x54, VK_P = 0x50;
+    const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_NOREPEAT = 0x4000, VK_T = 0x54, VK_P = 0x50, VK_V = 0x56;
 
     static readonly string DataFile = AppPaths.For("todos.txt");
     static readonly string PosFile = AppPaths.For("position.txt");
@@ -172,12 +173,16 @@ class TodoPanel : GlassWindow
         {
             if (msg == WM_HOTKEY)
             {
-                if (w.ToInt32() == 2) OpenDashboard(); else Toggle();
+                int id = w.ToInt32();
+                if (id == 2) OpenDashboard();
+                else if (id == 3) { if (Program.ClipboardPanel != null) Program.ClipboardPanel.Toggle(); }
+                else Toggle();
                 handled = true;
             }
             return IntPtr.Zero;
         });
         RegisterHotKey(hwnd, 2, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_P); // optional: the moon button also opens it
+        RegisterHotKey(hwnd, 3, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_V); // clipboard history; the island button also opens it
         Program.StartReminders(); // after the hotkey check, so a second instance never reminds twice or touches the log
     }
 

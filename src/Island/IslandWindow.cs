@@ -362,9 +362,11 @@ class IslandWindow : GlassWindow
         var mirror = RoundButton(Glyph(MirrorIcon), 34, clear, dim, OpenMirror);
         mirror.HorizontalAlignment = HorizontalAlignment.Right;
         controlsRow.Children.Add(mirror);
-        var stopwatch = RoundButton(Glyph(CountdownTimer.Icon), 34, clear, dim, OpenTimer);
-        stopwatch.HorizontalAlignment = HorizontalAlignment.Left;
-        controlsRow.Children.Add(stopwatch);
+        var tools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
+        tools.Children.Add(RoundButton(Glyph(CountdownTimer.Icon), 34, clear, dim, OpenTimer));
+        var clipboardGlyph = new TextBlock { Text = "", FontFamily = Icons, FontSize = 15, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        tools.Children.Add(RoundButton(clipboardGlyph, 34, clear, dim, () => { if (Program.ClipboardPanel != null) Program.ClipboardPanel.Toggle(); }));
+        controlsRow.Children.Add(tools);
         column.Children.Add(controlsRow);
 
         layer.Children.Add(column);
@@ -797,15 +799,7 @@ class IslandWindow : GlassWindow
     // windows moving behind it. Live refresh = SetWindowDisplayAffinity(exclude) + a recapture timer.
     void CaptureBackdrop()
     {
-        int wide = (int)((WinW + 2 * BlurMargin) * dpi), tall = (int)((WinH + 2 * BlurMargin) * dpi);
-        using (var bmp = new System.Drawing.Bitmap(wide, tall, System.Drawing.Imaging.PixelFormat.Format24bppRgb))
-        {
-            using (var g = System.Drawing.Graphics.FromImage(bmp))
-                g.CopyFromScreen((int)((Left - BlurMargin) * dpi), (int)((Top - BlurMargin) * dpi), 0, 0, bmp.Size);
-            var handle = bmp.GetHbitmap();
-            backdrop.Source = Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-            DeleteObject(handle);
-        }
+        backdrop.Source = Snapshot(Left - BlurMargin, Top - BlurMargin, WinW + 2 * BlurMargin, WinH + 2 * BlurMargin, dpi);
     }
 
     void Reveal(FrameworkElement el, int delay)
