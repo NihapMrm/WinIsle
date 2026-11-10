@@ -1,16 +1,18 @@
 using System;
+using System.Management;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
 
-// The charging animation, about 3 seconds: the island springs into a wide pill, a battery fills to the level
+// The charging animation, about 5 seconds: the island springs into a wide pill, a battery fills to the level
 // with a glow behind it and a shine sweeping across, a lightning bolt pops in, and the percentage counts up.
 partial class IslandWindow
 {
     const double ChargeW = 320, ChargeH = 64, ChargeR = 32, BatteryInnerW = 38;
-    const int ChargeMs = 3200;
+    const int ChargeMs = 5000;
     static readonly Geometry Bolt = Geometry.Parse("M13.5,2 L5,13.5 H11 L9.5,22 L19,9.5 H12.8 Z");
     static readonly Color ChargeGreen = Color.FromRgb(48, 209, 88), ChargeLow = Color.FromRgb(255, 120, 60);
 
@@ -62,6 +64,7 @@ partial class IslandWindow
         words.Children.Add(chargeSubtitle);
         Grid.SetColumn(words, 1);
         layer.Children.Add(words);
+        System.Windows.Documents.Typography.SetNumeralAlignment(chargePercent, FontNumeralAlignment.Tabular); // equal-width digits, so the live count doesn't jitter
         Grid.SetColumn(chargePercent, 2);
         layer.Children.Add(chargePercent);
         return layer;
@@ -125,7 +128,7 @@ partial class IslandWindow
         batteryFill.Background = fill;
         chargePercent.Foreground = new SolidColorBrush(color);
         chargeGlow.Fill = new RadialGradientBrush(Color.FromArgb(140, color.R, color.G, color.B), Color.FromArgb(0, color.R, color.G, color.B));
-        chargePercent.Text = "0%";
+        SetPercent(0);
 
         // Bolt pops in with an overshoot, then settles.
         boltPop.BeginAnimation(ScaleTransform.ScaleXProperty, Pop());
@@ -163,7 +166,8 @@ partial class IslandWindow
         var number = new SolidColorBrush(ChargeGreen);
         chargePercent.Foreground = number;
         number.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(settle, TimeSpan.FromMilliseconds(700)) { BeginTime = TimeSpan.FromMilliseconds(450), EasingFunction = cool });
-        chargePercent.Text = percent + "%";
+        double exactLevel, unusedRate, unusedWatts; // ponytail: one quick driver read on the UI thread; move off-thread if it ever stutters
+        SetPercent(ReadBatteryLive(out exactLevel, out unusedRate, out unusedWatts) ? exactLevel : percent);
 
         chargeGlow.Fill = new RadialGradientBrush(Color.FromArgb(140, ChargeGreen.R, ChargeGreen.G, ChargeGreen.B), Color.FromArgb(0, ChargeGreen.R, ChargeGreen.G, ChargeGreen.B));
         chargeGlow.BeginAnimation(OpacityProperty, new DoubleAnimation(0.9, 0, TimeSpan.FromMilliseconds(1100)) { BeginTime = TimeSpan.FromMilliseconds(250), EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
@@ -179,6 +183,16 @@ partial class IslandWindow
         WaitOut();
     }
 
+    // Shows the level with the whole number large and the decimals and % small, sitting on the same baseline.
+    void SetPercent(double level)
+    {
+        var text = level.ToString("F3");
+        int dot = text.IndexOf(System.Globalization.NumberFormatInfo.CurrentInfo.NumberDecimalSeparator, StringComparison.Ordinal);
+        chargePercent.Inlines.Clear();
+        chargePercent.Inlines.Add(new System.Windows.Documents.Run(text.Substring(0, dot)));
+        chargePercent.Inlines.Add(new System.Windows.Documents.Run(text.Substring(dot) + "%") { FontSize = 14 });
+    }
+
     static DoubleAnimationUsingKeyFrames Pop()
     {
         var pop = new DoubleAnimationUsingKeyFrames { BeginTime = TimeSpan.FromMilliseconds(180) };
@@ -188,21 +202,73 @@ partial class IslandWindow
         return pop;
     }
 
-    // Counts 0% up to the level with the same ease-out as the fill, so the two move together.
+    // Counts 0% up to the level with the same ease-out as the fill, then keeps climbing at the battery's real
+    // charge rate. The exact level and rate come from the battery driver, read off the UI thread once a second
+    // (the rate is often 0 for the first moment after plug-in). Until a read lands, or when the driver doesn't
+    // report them, it shows the whole-number percent and holds still.
     void CountUp(int percent, int delayMs, int durationMs)
     {
         var start = DateTime.UtcNow.AddMilliseconds(delayMs);
         var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
-        var tick = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+        double level = percent, perSec = 0; // the level at levelAt, and how fast it rises (% per second)
+        var levelAt = DateTime.UtcNow;
+        var lastRead = DateTime.MinValue;
+        bool reading = false, exact = false;
+        Func<DateTime, double> now = at => level + perSec * Math.Max(0, (at - levelAt).TotalSeconds);
+        // Three decimals at ~60 fps: at a typical 20-60 W the thousandths move several times a second.
+        var tick = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(16) };
         tick.Tick += (s, e) =>
         {
             if (!charging) { tick.Stop(); return; }
-            double t = (DateTime.UtcNow - start).TotalMilliseconds / durationMs;
+            var at = DateTime.UtcNow;
+            if (!reading && (at - lastRead).TotalSeconds >= 1)
+            {
+                reading = true;
+                lastRead = at;
+                Task.Run(() =>
+                {
+                    double p, r, watts;
+                    bool ok = ReadBatteryLive(out p, out r, out watts);
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        reading = false;
+                        if (!ok || !charging) return;
+                        var landed = DateTime.UtcNow;
+                        // The driver's capacity updates in steps, so never let a stale read pull the number back.
+                        level = exact ? Math.Max(p, now(landed)) : p;
+                        levelAt = landed;
+                        perSec = Math.Max(0, r);
+                        exact = true;
+                        if (watts > 0) chargeSubtitle.Text = "Power connected \u00B7 " + watts.ToString("0.#") + " W";
+                    }));
+                });
+            }
+            double t = (at - start).TotalMilliseconds / durationMs;
             if (t < 0) return;
-            if (t >= 1) { chargePercent.Text = percent + "%"; tick.Stop(); return; }
-            chargePercent.Text = (int)Math.Round(percent * ease.Ease(t)) + "%";
+            SetPercent(now(at) * (t < 1 ? ease.Ease(t) : 1));
         };
         tick.Start();
+    }
+
+    // The battery's exact level (%), charge rate (% per second) and charging power (W), summed over all
+    // batteries; false when the driver doesn't report capacities.
+    static bool ReadBatteryLive(out double percent, out double perSec, out double watts)
+    {
+        percent = perSec = watts = 0;
+        try
+        {
+            double remaining = 0, rate = 0, full = 0; // mWh, mW, mWh
+            using (var q = new ManagementObjectSearcher(@"root\wmi", "SELECT RemainingCapacity, ChargeRate FROM BatteryStatus"))
+                foreach (ManagementObject b in q.Get()) { remaining += Convert.ToDouble(b["RemainingCapacity"]); rate += Convert.ToDouble(b["ChargeRate"]); }
+            using (var q = new ManagementObjectSearcher(@"root\wmi", "SELECT FullChargedCapacity FROM BatteryFullChargedCapacity"))
+                foreach (ManagementObject b in q.Get()) full += Convert.ToDouble(b["FullChargedCapacity"]);
+            if (full <= 0 || remaining <= 0 || remaining > full * 1.1) return false;
+            percent = Math.Min(100, remaining / full * 100);
+            perSec = rate / full * 100 / 3600;
+            watts = rate / 1000;
+            return true;
+        }
+        catch { return false; }
     }
 
     // Part of Dismiss: put the charging layer away.
