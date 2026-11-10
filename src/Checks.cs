@@ -30,7 +30,7 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + VolumeSettingFailures() + SoundSettingFailures() + PreviewFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + VolumeSettingFailures() + SoundSettingFailures() + PreviewFailures() + ControlCenterFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
     }
 
     // Flashes and watchers: the pure parts (names, levels, matching).
@@ -289,6 +289,17 @@ static class Checks
         if (Tracker.Has(prayer.Key) || prayer.Title == null) fails++;
         if (BatteryReminder.Sample(true).Key != "low" || BatteryReminder.Sample(false).Key != "full") fails++;
         if (WindowsNotifications.Sample().Title == null) fails++;
+        return fails;
+    }
+
+    // Control Center: stepper arithmetic snaps to the step grid and stays in range; Prayer is the first page.
+    static int ControlCenterFailures()
+    {
+        int fails = 0;
+        if (ControlCenter.StepValue(90, 5, 15, 480, 1) != 95 || ControlCenter.StepValue(15, 5, 15, 480, -1) != 15) fails++;
+        if (Math.Abs(ControlCenter.StepValue(2.2, 0.2, 1, 6, 1) - 2.4) > 1e-9 || ControlCenter.StepValue(92, 5, 15, 480, 1) != 95) fails++;
+        if (ControlCenter.StepValue(478, 5, 15, 480, 1) != 480 || ControlCenter.StepValue(-29, 1, -30, 30, -1) != -30) fails++;
+        if (ControlCenter.Pages[0] != "Prayer" || ControlCenter.Pages.Length != 11) fails++;
         return fails;
     }
 

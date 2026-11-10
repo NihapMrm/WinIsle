@@ -6,7 +6,7 @@ using System.Windows.Controls;
 using System.Windows.Media;
 
 // Daily, by-prayer, time-to-pray and history cards.
-partial class PrayerDashboard : DashboardWindow
+partial class ControlCenter
 {
     // Daily prayed and missed as stacked columns on one 0 to 5 scale.
     Border TrendCard(Slot[] slots, bool animate)
@@ -110,7 +110,7 @@ partial class PrayerDashboard : DashboardWindow
             if (glyph != null && cellW >= 18) cell.Child = Glyph(glyph, 9, iconColor);
             var name = Prayers.SlotNames[slot.Index] + ", " + Md(slot.Day);
             Tip(cell, StatusLabel(slot.Status), name + (slot.Status == Tracker.Upcoming ? "" : " \u00B7 click to change"));
-            if (slot.Status != Tracker.Upcoming) Clickable(cell, name + ", " + StatusLabel(slot.Status) + ". Change status.", () => Toggle(current));
+            if (slot.Status != Tracker.Upcoming) Clickable(cell, name + ", " + StatusLabel(slot.Status) + ". Change status.", () => TogglePrayer(current));
             else AutomationProperties.SetName(cell, name + ", " + StatusLabel(slot.Status));
             Place2(canvas, cell, labelW + d * band + 1, slot.Index * rowH);
             if (slot.Index == 4 && (range - 1 - d) % step == 0)

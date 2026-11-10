@@ -375,6 +375,8 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         var rightTools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         rightTools.Children.Add(RoundButton(Glyph(ShelfIcon), 34, clear, dim, OpenShelf));
         rightTools.Children.Add(RoundButton(Glyph(MirrorIcon), 34, clear, dim, OpenMirror));
+        var gearGlyph = new TextBlock { Text = "", FontFamily = Icons, FontSize = 15, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        rightTools.Children.Add(RoundButton(gearGlyph, 34, clear, dim, () => ControlCenter.Open(null)));
         controlsRow.Children.Add(rightTools);
         var tools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
         tools.Children.Add(RoundButton(Glyph(CountdownTimer.Icon), 34, clear, dim, OpenTimer));

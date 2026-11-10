@@ -2,47 +2,36 @@ using System;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
-using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 
-// Today, tracking analytics and history. Settings and charts live in their own partial files.
-partial class PrayerDashboard : DashboardWindow
+// The Prayer page: today, tracking analytics and history. Its location row and charts live in their own partial
+// files; its reminder settings card is in ControlCenter.Pages.cs.
+partial class ControlCenter
 {
-    const double WinW = 1120, Side = 24, ContentW = WinW - 2 * Side, SettingsH = 104;
+    const double ContentW = PageW - 48, PrayerLocationH = 104; // 48: the page's side margins
 
     // Blue and orange instead of green and red: red and green fail colorblind separation here (deltaE 4.1 vs 26.8).
     static readonly Brush PrayedInk = SeriesBlue, MissedInk = Rgb(217, 89, 38), Warning = Rgb(250, 178, 25);
     static readonly Brush MissedWash = Rgb(217, 89, 38, 56);
 
-    readonly Border root = new Border();
-    readonly ScaleTransform rootScale = new ScaleTransform(0.97, 0.97);
     readonly TextBlock subtitle = T("", 13, Muted);
     readonly Grid todayRow = new Grid();
     readonly StackPanel rangeRow = new StackPanel { Orientation = Orientation.Horizontal };
     readonly StackPanel analytics = new StackPanel();
-    readonly Border settings = new Border { Height = 0, ClipToBounds = true };
+    readonly StackPanel prayerSettings = new StackPanel(); // the reminder settings card, under the dashboard
+    readonly Border prayerLocation = new Border { Height = 0, ClipToBounds = true };
     readonly TextBox latBox = Field(), lonBox = Field();
-    readonly TextBlock settingsNote = T("", 12.5, Soft);
+    readonly TextBlock prayerLocationNote = T("", 12.5, Soft);
     readonly TimeZoneInfo[] zones = TimeZoneInfo.GetSystemTimeZones().ToArray();
     int zoneIndex;
     int range = 30;
-    bool settingsOpen;
+    bool prayerLocationOpen;
     string signature;
+    DispatcherTimer prayerRefresh;
 
-    internal PrayerDashboard()
+    FrameworkElement BuildPrayerPage()
     {
-        Title = "Prayers";
-        Width = WinW;
-        Height = Math.Min(816, SystemParameters.WorkArea.Height - 16);
-        WindowStyle = WindowStyle.None;
-        ResizeMode = ResizeMode.NoResize;
-        WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        Background = Brushes.Transparent;
-        FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
-        Foreground = Ink;
-
         var titleBlock = new StackPanel { Orientation = Orientation.Horizontal };
         var moon = PrayerReminder.Moon(26);
         moon.Margin = new Thickness(0, 0, 12, 0);
@@ -52,72 +41,33 @@ partial class PrayerDashboard : DashboardWindow
         titles.Children.Add(subtitle);
         titleBlock.Children.Add(titles);
 
-        var closeFill = new SolidColorBrush(None);
-        var close = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(16), Background = closeFill, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Child = Glyph(CloseGlyph, 11, Soft) };
-        Clickable(close, "Close dashboard", FadeAndClose);
-        close.MouseEnter += (s, e) => Anim(closeFill, SelectedFill);
-        close.MouseLeave += (s, e) => Anim(closeFill, None);
-
-        var header = new Grid { Background = Brushes.Transparent, Margin = new Thickness(0, 0, 0, Gap + 2) };
-        header.Children.Add(titleBlock);
-        header.Children.Add(close);
-        header.MouseLeftButtonDown += (s, e) => DragMove();
-
+        todayRow.ColumnDefinitions.Clear();
         for (int i = 0; i < 5; i++) todayRow.ColumnDefinitions.Add(new ColumnDefinition());
         todayRow.Margin = new Thickness(0, 0, 0, Gap);
 
         var filters = new Grid { Margin = new Thickness(0, 0, 0, Gap) };
         filters.Children.Add(rangeRow);
-        var settingsButton = Pill("Location & time zone", false, ToggleSettings);
-        settingsButton.HorizontalAlignment = HorizontalAlignment.Right;
-        filters.Children.Add(settingsButton);
+        var locationButton = Pill("Location & time zone", false, TogglePrayerLocation);
+        locationButton.HorizontalAlignment = HorizontalAlignment.Right;
+        filters.Children.Add(locationButton);
 
-        BuildSettings();
+        BuildPrayerLocation();
 
         var body = new StackPanel();
         body.Children.Add(todayRow);
         body.Children.Add(filters);
-        body.Children.Add(settings);
+        body.Children.Add(prayerLocation);
         body.Children.Add(analytics);
-        var scroll = new ScrollViewer { Content = body, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden };
+        body.Children.Add(prayerSettings);
 
-        var layout = new Grid { Margin = new Thickness(Side, 18, Side, 16) };
-        layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        layout.RowDefinitions.Add(new RowDefinition());
-        Grid.SetRow(scroll, 1);
-        layout.Children.Add(header);
-        layout.Children.Add(scroll);
-
-        root.Child = layout;
-        root.CornerRadius = new CornerRadius(8);
-        root.BorderThickness = new Thickness(1);
-        root.Background = new LinearGradientBrush(Color.FromArgb(22, 255, 255, 255), Color.FromArgb(6, 255, 255, 255), 90);
-        root.BorderBrush = new LinearGradientBrush(Color.FromArgb(110, 255, 255, 255), Color.FromArgb(20, 255, 255, 255), 90);
-        root.Opacity = 0;
-        root.RenderTransform = rootScale;
-        root.RenderTransformOrigin = new Point(0.5, 0.5);
-        Content = root;
-
-        Render(true);
-
-        PreviewKeyDown += (s, e) => { if (e.Key == Key.Escape) { FadeAndClose(); e.Handled = true; } };
-        SourceInitialized += (s, e) => MakeGlass(new WindowInteropHelper(this).Handle, unchecked((int)0xE61F1C1C));
-        Loaded += (s, e) =>
-        {
-            Anim(root, OpacityProperty, 1, 220, Out);
-            Anim(rootScale, ScaleTransform.ScaleXProperty, 1, 380, Spring);
-            Anim(rootScale, ScaleTransform.ScaleYProperty, 1, 380, Spring);
-        };
-        var refresh = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
-        refresh.Tick += (s, e) => { if (Signature(CurrentSlots(Prayers.Now), Prayers.Now) != signature) Render(false); };
-        refresh.Start();
-        Closed += (s, e) => refresh.Stop();
+        PrayerRender(true);
+        prayerRefresh = new DispatcherTimer { Interval = TimeSpan.FromSeconds(20) };
+        prayerRefresh.Tick += (s, e) => { if (Signature(CurrentSlots(Prayers.Now), Prayers.Now) != signature) PrayerRender(false); };
+        prayerRefresh.Start();
+        return PageFrame(titleBlock, body);
     }
 
-    void FadeAndClose()
-    {
-        Go(root, OpacityProperty, 0, 130, Out, 0, (s, e) => Close(), null);
-    }
+    void StopPrayer() { if (prayerRefresh != null) prayerRefresh.Stop(); }
 
     static string StatusLabel(int status)
     {
@@ -149,18 +99,18 @@ partial class PrayerDashboard : DashboardWindow
     internal void SetRange(int days)
     {
         range = days;
-        Render(true);
+        PrayerRender(true);
     }
 
-    void Toggle(Slot slot)
+    void TogglePrayer(Slot slot)
     {
         if (slot.Status == Tracker.Upcoming) return;
         if (slot.Status == Tracker.Prayed) Tracker.Unmark(slot.Key);
         else Tracker.Mark(slot.Key, slot.Status == Tracker.Pending ? Prayers.Now : (DateTime?)null); // stamps only real, in-time answers
-        Render(false);
+        PrayerRender(false);
     }
 
-    void Render(bool animate)
+    void PrayerRender(bool animate)
     {
         var now = Prayers.Now;
         var slots = CurrentSlots(now);
@@ -224,7 +174,7 @@ partial class PrayerDashboard : DashboardWindow
             if (slot.Status == Tracker.Pending) card.BorderBrush = Warning;
             if (slot.Status != Tracker.Upcoming)
             {
-                Clickable(card, Prayers.SlotNames[slot.Index] + ", " + StatusLabel(slot.Status) + ". Change status.", () => Toggle(current));
+                Clickable(card, Prayers.SlotNames[slot.Index] + ", " + StatusLabel(slot.Status) + ". Change status.", () => TogglePrayer(current));
                 Tip(card, StatusLabel(slot.Status), slot.Status == Tracker.Prayed ? "Click to undo" : "Click to mark prayed");
             }
             Grid.SetColumn(card, slot.Index);

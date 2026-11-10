@@ -170,6 +170,136 @@ abstract class DashboardWindow : GlassWindow
         return box;
     }
 
+    // ---- settings widgets (Control Center) ----
+    // Each takes its value and a callback, and hands back a setter so the page can show changes made elsewhere.
+
+    static readonly Brush SwitchOff = Rgb(255, 255, 255, 40), SwitchOn = Rgb(48, 209, 88);
+
+    // An on/off toggle. Space or Enter flips it from the keyboard.
+    protected static Border Switch(bool on, Action<bool> changed, string name, out Action<bool> set)
+    {
+        bool state = on;
+        var knobMove = new TranslateTransform(on ? 18 : 0, 0);
+        var knob = new System.Windows.Shapes.Ellipse { Width = 18, Height = 18, Fill = Brushes.White, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(2, 0, 0, 0), RenderTransform = knobMove };
+        var fill = new SolidColorBrush(((SolidColorBrush)(on ? SwitchOn : SwitchOff)).Color);
+        var track = new Border { Width = 40, Height = 22, CornerRadius = new CornerRadius(11), Background = fill, Child = knob, VerticalAlignment = VerticalAlignment.Center };
+        Action<bool> show = v =>
+        {
+            state = v;
+            Anim(knobMove, TranslateTransform.XProperty, v ? 18 : 0, 180, Out);
+            Anim(fill, ((SolidColorBrush)(v ? SwitchOn : SwitchOff)).Color);
+            AutomationProperties.SetItemStatus(track, v ? "On" : "Off");
+        };
+        Clickable(track, name, () => { show(!state); changed(state); });
+        set = v => { if (v != state) show(v); };
+        AutomationProperties.SetItemStatus(track, on ? "On" : "Off");
+        return track;
+    }
+
+    // value + step * direction, snapped to the step grid and kept in range (92 up by 5 is 95, not 97).
+    internal static double StepValue(double value, double step, double min, double max, int direction)
+    {
+        double k = value / step;
+        double next = direction > 0 ? Math.Floor(k + 1e-9) + 1 : Math.Ceiling(k - 1e-9) - 1;
+        return Math.Max(min, Math.Min(max, Math.Round(next * step, 6)));
+    }
+
+    static string Show(double value, double step) { return value.ToString(step < 1 ? "0.0#" : "0", CultureInfo.CurrentCulture); }
+
+    // − value unit +. Holding a button repeats; the value can also be typed (Enter or leaving the box applies it).
+    protected static FrameworkElement Stepper(double value, double step, double min, double max, string unit, Action<double> changed, string name, out Action<double> set)
+    {
+        double current = value;
+        var box = new TextBox { Width = 52, Height = 30, FontSize = 13, TextAlignment = TextAlignment.Center, VerticalContentAlignment = VerticalAlignment.Center, Background = Faint, Foreground = Ink, CaretBrush = Ink, BorderBrush = CardLine, BorderThickness = new Thickness(1), Text = Show(value, step) };
+        AutomationProperties.SetName(box, name);
+        Action<double> apply = v =>
+        {
+            v = Math.Max(min, Math.Min(max, v));
+            box.Text = Show(v, step);
+            if (v == current) return;
+            current = v;
+            changed(v);
+        };
+        Action commit = () =>
+        {
+            double typed;
+            if (double.TryParse(box.Text, NumberStyles.Float, CultureInfo.CurrentCulture, out typed) || double.TryParse(box.Text, NumberStyles.Float, Inv, out typed)) apply(typed);
+            else box.Text = Show(current, step);
+        };
+        box.LostKeyboardFocus += (s, e) => commit();
+        box.KeyDown += (s, e) =>
+        {
+            if (e.Key == Key.Enter) { commit(); e.Handled = true; }
+            else if (e.Key == Key.Up || e.Key == Key.Down) { apply(StepValue(current, step, min, max, e.Key == Key.Up ? 1 : -1)); e.Handled = true; }
+        };
+        Func<string, int, Border> button = (glyph, direction) =>
+        {
+            var wash = new SolidColorBrush(None);
+            var b = new Border { Width = 30, Height = 30, CornerRadius = new CornerRadius(15), Background = wash, Child = Glyph(glyph, 11, Soft) };
+            var repeat = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(420) };
+            Action stepOnce = () => apply(StepValue(current, step, min, max, direction));
+            repeat.Tick += (s, e) => { repeat.Interval = TimeSpan.FromMilliseconds(70); stepOnce(); };
+            // Not Clickable: press-and-hold needs the button-down itself.
+            b.Cursor = Cursors.Hand;
+            b.Focusable = true;
+            b.FocusVisualStyle = FocusRing;
+            AutomationProperties.SetName(b, (direction > 0 ? "Increase " : "Decrease ") + name);
+            b.MouseLeftButtonDown += (s, e) => { e.Handled = true; b.CaptureMouse(); stepOnce(); repeat.Interval = TimeSpan.FromMilliseconds(420); repeat.Start(); };
+            b.MouseLeftButtonUp += (s, e) => { e.Handled = true; repeat.Stop(); b.ReleaseMouseCapture(); };
+            b.LostMouseCapture += (s, e) => repeat.Stop();
+            b.KeyDown += (s, e) => { if (e.Key == Key.Enter || e.Key == Key.Space) stepOnce(); };
+            b.MouseEnter += (s, e) => Anim(wash, HoverFill);
+            b.MouseLeave += (s, e) => Anim(wash, None);
+            return b;
+        };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+        row.Children.Add(button("", -1)); // minus
+        row.Children.Add(box);
+        var unitText = T(unit, 12.5, Soft);
+        unitText.VerticalAlignment = VerticalAlignment.Center;
+        unitText.Margin = new Thickness(6, 0, 4, 0);
+        unitText.MinWidth = 26;
+        row.Children.Add(unitText);
+        row.Children.Add(button("", 1)); // plus
+        set = v => { current = v; if (!box.IsKeyboardFocused) box.Text = Show(v, step); };
+        return row;
+    }
+
+    // A text setting: applied on Enter or when the box loses focus.
+    protected static TextBox TextSetting(string value, double width, Action<string> changed, string name, out Action<string> set)
+    {
+        var box = Field();
+        box.Width = width;
+        box.Text = value;
+        AutomationProperties.SetName(box, name);
+        string current = value;
+        Action commit = () => { if (box.Text != current) { current = box.Text; changed(current); } };
+        box.LostKeyboardFocus += (s, e) => commit();
+        box.KeyDown += (s, e) => { if (e.Key == Key.Enter) { commit(); e.Handled = true; } };
+        set = v => { current = v; if (!box.IsKeyboardFocused) box.Text = v; };
+        return box;
+    }
+
+    // One settings line: label and hint on the left, the control on the right. Hint may be null.
+    protected static Grid Row(string label, string hint, UIElement control, out TextBlock hintText)
+    {
+        var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 16, 0) };
+        words.Children.Add(T(label, 13.5, Ink));
+        hintText = T(hint ?? "", 12, Muted);
+        hintText.TextWrapping = TextWrapping.Wrap;
+        hintText.Visibility = hint == null ? Visibility.Collapsed : Visibility.Visible;
+        words.Children.Add(hintText);
+        var grid = new Grid { Margin = new Thickness(0, 6, 0, 6), MinHeight = 34 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition());
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.Children.Add(words);
+        var c = control as FrameworkElement;
+        if (c != null) c.VerticalAlignment = VerticalAlignment.Center;
+        Grid.SetColumn(control, 1);
+        grid.Children.Add(control);
+        return grid;
+    }
+
     protected static Border Tile(string label, string value, string note, double size)
     {
         var stack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };

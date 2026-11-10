@@ -5,7 +5,7 @@ using System.Windows;
 using System.Windows.Controls;
 
 // The location and time zone row.
-partial class PrayerDashboard : DashboardWindow
+partial class ControlCenter
 {
     class Place { public string Name; public double Lat, Lon; public Place(string n, double a, double o) { Name = n; Lat = a; Lon = o; } }
 
@@ -18,7 +18,7 @@ partial class PrayerDashboard : DashboardWindow
         new Place("Mannar", 8.981, 79.904), new Place("Anuradhapura", 8.312, 80.414),
     };
 
-    void BuildSettings()
+    void BuildPrayerLocation()
     {
         var zoneLabels = zones.Select(z => z.DisplayName).ToArray();
         zoneIndex = Math.Max(0, Array.FindIndex(zones, z => z.Id == Prayers.Zone.Id));
@@ -37,11 +37,11 @@ partial class PrayerDashboard : DashboardWindow
             if (sriLanka >= 0) { zoneIndex = sriLanka; setZone(sriLanka); }
         }, "Location", out ignore);
 
-        var save = Pill("Save", true, SaveSettings);
+        var save = Pill("Save", true, SavePrayerLocation);
         save.VerticalAlignment = VerticalAlignment.Bottom;
         save.Margin = new Thickness(0, 0, 0, 4);
-        settingsNote.VerticalAlignment = VerticalAlignment.Bottom;
-        settingsNote.Margin = new Thickness(12, 0, 0, 8);
+        prayerLocationNote.VerticalAlignment = VerticalAlignment.Bottom;
+        prayerLocationNote.Margin = new Thickness(12, 0, 0, 8);
 
         var row = new StackPanel { Orientation = Orientation.Horizontal };
         row.Children.Add(Labelled("Location", placeDrop));
@@ -49,22 +49,22 @@ partial class PrayerDashboard : DashboardWindow
         row.Children.Add(Labelled("Latitude", latBox));
         row.Children.Add(Labelled("Longitude", lonBox));
         row.Children.Add(save);
-        row.Children.Add(settingsNote);
-        settings.Child = new Border { Margin = new Thickness(0, 0, 0, Gap), Child = Card(row) };
+        row.Children.Add(prayerLocationNote);
+        prayerLocation.Child = new Border { Margin = new Thickness(0, 0, 0, Gap), Child = Card(row) };
     }
 
-    internal void ToggleSettings()
+    internal void TogglePrayerLocation()
     {
-        settingsOpen = !settingsOpen;
-        Anim(settings, HeightProperty, settingsOpen ? SettingsH : 0, 340, settingsOpen ? Spring : Out);
+        prayerLocationOpen = !prayerLocationOpen;
+        Anim(prayerLocation, HeightProperty, prayerLocationOpen ? PrayerLocationH : 0, 340, prayerLocationOpen ? Spring : Out);
     }
 
-    void SaveSettings()
+    void SavePrayerLocation()
     {
         double lat, lon;
         if (!double.TryParse(latBox.Text, NumberStyles.Float, Inv, out lat) || !double.TryParse(lonBox.Text, NumberStyles.Float, Inv, out lon) || !Prayers.ValidLocation(lat, lon))
         {
-            settingsNote.Text = "Enter latitude -90 to 90, longitude -180 to 180.";
+            prayerLocationNote.Text = "Enter latitude -90 to 90, longitude -180 to 180.";
             return;
         }
         var match = Places.FirstOrDefault(x => Math.Abs(x.Lat - lat) < 0.001 && Math.Abs(x.Lon - lon) < 0.001);
@@ -72,7 +72,7 @@ partial class PrayerDashboard : DashboardWindow
         Prayers.Lat = lat;
         Prayers.Lon = lon;
         Prayers.Zone = zones[zoneIndex];
-        settingsNote.Text = Prayers.SaveSettings() ? "Saved." : "Applied, but could not be saved to disk.";
-        Render(false);
+        prayerLocationNote.Text = Prayers.SaveSettings() ? "Saved." : "Applied, but could not be saved to disk.";
+        PrayerRender(false);
     }
 }

@@ -1,5 +1,5 @@
 // Always-on-top glass todo panel. Ctrl+Alt+T toggles, Esc / Ctrl+Q hide, Ctrl+Shift+Q quits.
-// Also owns the app's hotkeys: Ctrl+Alt+P prayer dashboard, Ctrl+Alt+V clipboard history.
+// Also owns the app's hotkeys: Ctrl+Alt+P Control Center (Prayer page), Ctrl+Alt+S Control Center, Ctrl+Alt+V clipboard history.
 // Build: build.cmd (uses the .NET Framework csc.exe that ships with Windows, C# 5).
 using System;
 using System.IO;
@@ -19,7 +19,7 @@ class TodoPanel : GlassWindow
     [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr hwnd, int id, uint mods, uint vk);
 
     const int WM_HOTKEY = 0x0312;
-    const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_NOREPEAT = 0x4000, VK_T = 0x54, VK_P = 0x50, VK_V = 0x56;
+    const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_NOREPEAT = 0x4000, VK_T = 0x54, VK_P = 0x50, VK_V = 0x56, VK_S = 0x53;
 
     static readonly string DataFile = AppPaths.For("todos.txt");
     static readonly string PosFile = AppPaths.For("position.txt");
@@ -34,7 +34,6 @@ class TodoPanel : GlassWindow
     readonly TranslateTransform slide = new TranslateTransform();
     bool hiding;
     TextBox editing; // inline editor of the row being renamed, if any
-    PrayerDashboard dashboard;
 
     internal TodoPanel()
     {
@@ -55,11 +54,15 @@ class TodoPanel : GlassWindow
         count.HorizontalAlignment = HorizontalAlignment.Right;
         count.VerticalAlignment = VerticalAlignment.Center;
         count.Opacity = 0.55;
-        count.Margin = new Thickness(0, 0, 62, 0);
+        count.Margin = new Thickness(0, 0, 92, 0);
         header.Children.Add(count);
-        var prayersButton = HeaderButton(PrayerReminder.Moon(15), "Prayer dashboard (Ctrl+Alt+P)", OpenDashboard);
-        prayersButton.Margin = new Thickness(0, 0, 30, 0);
+        var prayersButton = HeaderButton(PrayerReminder.Moon(15), "Prayers (Ctrl+Alt+P)", () => ControlCenter.Open("Prayer"));
+        prayersButton.Margin = new Thickness(0, 0, 60, 0);
         header.Children.Add(prayersButton);
+        var gearGlyph = new TextBlock { Text = "", FontFamily = Icons, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var gearButton = HeaderButton(gearGlyph, "Control Center (Ctrl+Alt+S)", () => ControlCenter.Open(null));
+        gearButton.Margin = new Thickness(0, 0, 30, 0);
+        header.Children.Add(gearButton);
         // Close only hides the panel, so the reminders keep running; Ctrl+Alt+T brings it back.
         var closeGlyph = new TextBlock { Text = "", FontFamily = Icons, FontSize = 10, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         header.Children.Add(HeaderButton(closeGlyph, "Close (Ctrl+Alt+T to open)", HidePanel));
@@ -174,7 +177,8 @@ class TodoPanel : GlassWindow
             if (msg == WM_HOTKEY)
             {
                 int id = w.ToInt32();
-                if (id == 2) OpenDashboard();
+                if (id == 2) ControlCenter.Open("Prayer");
+                else if (id == 4) ControlCenter.Open(null);
                 else if (id == 3) { if (Program.ClipboardPanel != null) Program.ClipboardPanel.Toggle(); }
                 else Toggle();
                 handled = true;
@@ -183,19 +187,11 @@ class TodoPanel : GlassWindow
         });
         RegisterHotKey(hwnd, 2, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_P); // optional: the moon button also opens it
         RegisterHotKey(hwnd, 3, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_V); // clipboard history; the island button also opens it
+        RegisterHotKey(hwnd, 4, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_S); // Control Center; the gear buttons also open it
+        // The panel is topmost and would sit on top of the Control Center.
+        ControlCenter.Opening += () => { if (IsVisible && !hiding) HidePanel(); };
         Program.StartReminders(); // after the hotkey check, so a second instance never reminds twice or touches the log
-    }
-
-    void OpenDashboard()
-    {
-        if (IsVisible && !hiding) HidePanel(); // the panel is topmost and would sit on top of the dashboard
-        if (dashboard == null)
-        {
-            dashboard = new PrayerDashboard();
-            dashboard.Closed += (s, e) => dashboard = null;
-            dashboard.Show();
-        }
-        dashboard.Activate();
+        if (!Settings.On(Settings.ShowPanel)) Dispatcher.BeginInvoke(new Action(HidePanel)); // "Show todo panel on start" is off
     }
 
     // ---- show / hide ----
