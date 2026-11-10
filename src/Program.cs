@@ -56,6 +56,7 @@ static class Program
         // Brief flashes and the camera / mic dots. Each watcher fails quietly where the PC lacks the hardware.
         ChargeWatcher.Watch(island.ShowCharging);
         volume = VolumeWatcher.Watch(island.Dispatcher, island.Flash);
+        island.Volume = volume; // the player's volume bar and scrolling
         BrightnessWatcher.Watch(island.Dispatcher, island.Flash);
         BluetoothWatcher.Watch(island.Dispatcher, island.Flash);
         ScreenshotWatcher.Watch(island.Dispatcher, island.AddScreenshot);

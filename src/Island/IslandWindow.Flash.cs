@@ -53,9 +53,14 @@ partial class IslandWindow
         };
         levelBar.MouseMove += (s, e) => { if (levelBar.IsMouseCaptured) Adjust(e.GetPosition(levelBar).X / LevelW); };
         levelBar.MouseLeftButtonUp += (s, e) => levelBar.ReleaseMouseCapture();
-        MouseWheel += (s, e) => // on the window: the pill is built after this, and only a flash makes it count
+        // On the window, so it only gets scrolls nothing else took (timer wheels and the shelf list take theirs).
+        MouseWheel += (s, e) =>
         {
-            if (!Adjustable()) return;
+            if (!Adjustable())
+            {
+                if (VolumeScrollHere()) { e.Handled = true; Volume.Scroll(e.Delta); }
+                return;
+            }
             e.Handled = true;
             wheelSum += e.Delta;
             int notches = wheelSum / 120;
@@ -89,6 +94,7 @@ partial class IslandWindow
 
     internal void Flash(IslandNotice n)
     {
+        if (n.Key == "volume" && n.Level.HasValue) ShowPlayerVolume(n.Level.Value, n.Time == "Muted"); // the player's bar follows every change
         if (shown != null && !flashing) return; // a reminder is on screen and matters more
         if (mirrorOn || timerOpen || shelfOpen || (mediaOpen && IsMouseOver)) return; // never pull the island from under the mouse
         flashUntil = DateTime.UtcNow.AddMilliseconds(FlashMs);

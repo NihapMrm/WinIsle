@@ -110,6 +110,8 @@ Flashes never interrupt a reminder, an open panel, or the player while your mous
 
 **Volume keys** are handled by the island itself: it takes the volume up, down and mute keys before Windows does, so Windows' own volume pop-up no longer appears, and the pill shows even at 0% and 100%. If MyTodo closes, Windows handles the keys again.
 
+**Mouse volume:** hold the mouse wheel down and scroll, anywhere on screen: up raises the volume, down lowers it, 2% per notch, with the island's pill. The page under the mouse doesn't scroll meanwhile. A wheel press released without scrolling still works as a normal middle click (open link in new tab, close tab); only holding the wheel down to drag (browser autoscroll, panning in some apps) is taken over.
+
 **Brightness keys** are handled by the laptop's firmware, which Windows apps can't intercept. So Windows' brightness pop-up still appears, and pressing past 0% or 100% shows nothing (no change happens, so nothing is reported).
 
 **Sounds:** each reminder plays a short sound. Water uses water drops. Battery and timer alarms loop an alarm-clock beep until you answer them or the condition is gone.
@@ -204,6 +206,7 @@ Hover over the top centre to open the player. It hangs from the top edge of the 
 
 - It shows whatever Windows is playing, from Spotify, a browser, a media player or another app: cover art, title, artist and app icon.
 - The timeline shows elapsed and remaining time. Click the bar to seek.
+- **Volume:** scroll anywhere on the open player to change the volume (2% per notch), or click or drag the volume bar under the buttons. The bar follows every volume change, from keys or other apps too. Scrolling keeps its own job in the timer wheels, the shelf list and the volume/brightness pill.
 - Buttons: previous, play/pause and next.
 - Tool buttons: timer and clipboard on the left; shelf and mirror on the right.
 - Paused media stays available, so you can resume from the island. With no media app open, it shows "Nothing playing".

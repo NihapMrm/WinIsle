@@ -56,6 +56,9 @@ static class Checks
         // Volume keys handled here: 2% steps like Windows, snapping to the 2% grid, stopping at 0 and 100%.
         if (Math.Abs(VolumeWatcher.Step(0.12, true) - 0.14) > 1e-9 || Math.Abs(VolumeWatcher.Step(0.131, false) - 0.12) > 1e-9) fails++;
         if (VolumeWatcher.Step(1, true) != 1 || VolumeWatcher.Step(0, false) != 0 || Math.Abs(VolumeWatcher.Step(0.99, true) - 1) > 1e-9) fails++;
+        // Wheel-held scrolling: whole notches either way, small touchpad deltas kept until they make one.
+        int wheel = 0;
+        if (VolumeWatcher.Notches(ref wheel, 120) != 1 || VolumeWatcher.Notches(ref wheel, -240) != -2 || VolumeWatcher.Notches(ref wheel, 60) != 0 || VolumeWatcher.Notches(ref wheel, 60) != 1 || wheel != 0) fails++;
         var nodes = new[]
         {
             new System.Collections.Generic.KeyValuePair<string, object>("OPPO F19 Pro Hands-Free HF", null),

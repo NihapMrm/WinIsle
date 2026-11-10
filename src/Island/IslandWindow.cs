@@ -32,7 +32,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
     const double CompactW = 244, CompactH = 44;
     // Media: a pill tucked above the screen edge with PeekShown px showing, opening into a player on hover.
     const double PeekW = 150, PeekH = 20, PeekShown = 6, PeekTop = PeekShown - Inset - PeekH, GoneTop = -(Inset + PeekH + 4);
-    const double MediaW = 380, MediaH = 160, MediaR = 30, MediaPad = 14;
+    const double MediaW = 380, MediaH = 188, MediaR = 30, MediaPad = 14; // 160 + the volume row
     const double MirrorW = 360, MirrorH = 270, MirrorR = 28; // 4:3, the camera's shape
     const double TimerW = 340, TimerH = 220, TimerR = 30;
     const double TimerPeekW = 120, TimerPeekH = 30; // the peek grows to this while a timer runs, showing the time left
@@ -381,6 +381,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         tools.Children.Add(RoundButton(clipboardGlyph, 34, clear, dim, () => { if (Program.ClipboardPanel != null) Program.ClipboardPanel.Toggle(); }));
         controlsRow.Children.Add(tools);
         column.Children.Add(controlsRow);
+        column.Children.Add(BuildVolumeRow());
 
         layer.Children.Add(column);
         return layer;
@@ -624,6 +625,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         if (mediaNow != null) Fill(mediaNow);
         HangFromLid(MediaW, MediaH, MediaR);
         Reveal(mediaLayer, 120);
+        RefreshPlayerVolume();
     }
 
     // Flush with the screen's top edge: the top corners sit above the screen, so the island hangs from the lid.
