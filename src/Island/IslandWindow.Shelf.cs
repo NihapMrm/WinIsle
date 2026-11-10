@@ -16,7 +16,8 @@ partial class IslandWindow
     internal static readonly Geometry ShelfIcon = Geometry.Parse("M3,13 H8 L9.5,15.5 H14.5 L16,13 H21 V19 A2,2 0 0 1 19,21 H5 A2,2 0 0 1 3,19 Z M5.5,4 H18.5 L21,12 H15 L13.5,14 H10.5 L9,12 H3 Z");
     static readonly Color ShelfAccent = Color.FromRgb(110, 180, 255);
 
-    readonly WrapPanel shelfTiles = new WrapPanel { Width = ShelfW - 2 * MediaPad };
+    // Top margin: room for the remove buttons, which sit 5 px above each tile and would be cut by the scroll area.
+    readonly WrapPanel shelfTiles = new WrapPanel { Width = ShelfW - 2 * MediaPad, Margin = new Thickness(0, 6, 0, 0) };
     readonly TextBlock shelfCount = new TextBlock { FontSize = 12, Opacity = 0.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 1, 0, 0) };
     readonly System.Windows.Shapes.Rectangle dropOutline = new System.Windows.Shapes.Rectangle { RadiusX = 16, RadiusY = 16, StrokeThickness = 1.5, StrokeDashArray = new DoubleCollection { 4, 3 }, Stroke = new SolidColorBrush(Color.FromArgb(80, 255, 255, 255)) };
     readonly Dictionary<string, ImageSource> shelfThumbs = new Dictionary<string, ImageSource>(StringComparer.OrdinalIgnoreCase);
@@ -79,8 +80,11 @@ partial class IslandWindow
         dropZone.Children.Add(hint);
         column.Children.Add(dropZone);
 
-        column.Children.Add(new ScrollViewer { Content = shelfTiles, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, MaxHeight = ShelfListMax, Margin = new Thickness(0, 10, 0, 0) });
+        column.Children.Add(new ScrollViewer { Content = shelfTiles, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, MaxHeight = ShelfListMax, Margin = new Thickness(0, 4, 0, 0) });
         layer.Children.Add(column);
+        // The real laid-out height decides the island's height: a measure taken right after adding tiles can come
+        // up short (the first opening cut the tiles in half), and this also follows any later change.
+        layer.SizeChanged += (s, e) => { if (shelfOpen) HangFromLid(ShelfW, e.NewSize.Height + 2 * MediaPad, ShelfR); };
         return layer;
     }
 
@@ -131,8 +135,8 @@ partial class IslandWindow
         shelfTiles.Visibility = shelf.Count == 0 ? Visibility.Collapsed : Visibility.Visible;
         if (shelfOpen)
         {
-            shelfLayer.Measure(new Size(ShelfW - 2 * MediaPad, double.PositiveInfinity));
-            HangFromLid(ShelfW, shelfLayer.DesiredSize.Height + 2 * MediaPad, ShelfR);
+            shelfLayer.UpdateLayout(); // lay the new tiles out now, so the height is right from the first frame
+            HangFromLid(ShelfW, shelfLayer.ActualHeight + 2 * MediaPad, ShelfR);
         }
     }
 
