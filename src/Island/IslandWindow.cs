@@ -23,7 +23,8 @@ class IslandWindow : GlassWindow
     class SpringValue { public double X, V, To; }
 
     const double Stiffness = 260, Damping = 24; // slightly underdamped: a small settle, no wobble
-    const double WinW = 500, WinH = 170, Inset = 2, BlurMargin = 40;
+    const double WinW = 500, WinH = 420, Inset = 2, BlurMargin = 40; // tall enough for an expanded notification; empty pixels pass clicks through
+    const int ExpandedLines = 16;
     const double SeedW = 76, SeedH = 26;
     const double CompactW = 244, CompactH = 44;
 
@@ -70,6 +71,8 @@ class IslandWindow : GlassWindow
     IslandNotice shown; // what the island is displaying; null while hidden
     int shownIndex;     // whose notice that is, in reminders
     bool confirmed;
+    bool expanded;       // the notice was clicked open to show all of it
+    IslandSize size;     // the shown notice's layout
 
     // Raised after the island has gone following a yes answer.
     internal event Action Confirmed;
@@ -128,6 +131,8 @@ class IslandWindow : GlassWindow
         who.Children.Add(tile);
         who.Children.Add(titles);
         header = Layer(0, 0, 0);
+        header.Background = Brushes.Transparent; // the whole header is clickable, not only the text
+        header.MouseLeftButtonUp += (s, e) => Expand();
         header.Children.Add(who);
         header.Children.Add(timeText);
 
@@ -218,7 +223,7 @@ class IslandWindow : GlassWindow
         }
         if (shown != null)
         {
-            if (!open) return;
+            if (!open || expanded) return; // an expanded notice stays until a button is clicked
             // A higher-priority reminder takes over; this one stays due and returns afterwards.
             if ((due != null && dueIndex < shownIndex && !shown.Sticky) || !reminders[shownIndex].StillCurrent(shown)) Dismiss();
             return;
@@ -260,8 +265,10 @@ class IslandWindow : GlassWindow
         detailText.Text = notice.Detail;
         yesLabel.Text = notice.YesLabel;
         noLabel.Text = notice.NoLabel ?? "Not yet";
-        var size = notice.Small ? Small : Regular;
-        double extra = Fit(size);
+        expanded = false;
+        header.Cursor = notice.More == null ? null : Cursors.Hand;
+        size = notice.Small ? Small : Regular;
+        double extra = Fit(size, 3);
         smallIcon.Data = bigIcon.Data = notice.Icon;
         smallIcon.Fill = bigIcon.Fill = new SolidColorBrush(accent);
         glow.Fill = new RadialGradientBrush(Color.FromArgb(120, accent.R, accent.G, accent.B), Color.FromArgb(0, accent.R, accent.G, accent.B));
@@ -293,13 +300,25 @@ class IslandWindow : GlassWindow
         });
     }
 
-    // Sizes the open layout. Returns the extra height wrapped detail text needs (up to 3 lines).
-    double Fit(IslandSize s)
+    // Clicking the notice shows all of it: the island grows and the buttons slide down.
+    void Expand()
+    {
+        if (!open || expanded || shown.More == null) return;
+        expanded = true;
+        double from = actions.Margin.Top;
+        detailText.Text = shown.More;
+        double extra = Fit(size, ExpandedLines);
+        actions.BeginAnimation(MarginProperty, new ThicknessAnimation(new Thickness(0, from, 0, 0), actions.Margin, TimeSpan.FromMilliseconds(420)) { EasingFunction = Spring });
+        Morph(size.Width, size.OpenH + extra, size.OpenR);
+    }
+
+    // Sizes the open layout. Returns the extra height wrapped detail text needs, up to the given number of lines.
+    double Fit(IslandSize s, int lines)
     {
         nameText.FontSize = timeText.FontSize = s.TitleFont;
         nameText.MaxWidth = detailText.MaxWidth = s.TextW;
         detailText.FontSize = s.DetailFont;
-        detailText.MaxHeight = 3 * s.LineH;
+        detailText.MaxHeight = lines * s.LineH;
         tile.Width = tile.Height = glow.Width = glow.Height = bigLogo.Width = bigLogo.Height = s.Tile;
         tile.Margin = new Thickness(0, 0, s.Gap, 0);
         bigLogo.Clip = new EllipseGeometry(new Point(s.Tile / 2, s.Tile / 2), s.Tile / 2, s.Tile / 2);
@@ -313,7 +332,8 @@ class IslandWindow : GlassWindow
         header.Margin = new Thickness(0, Inset + s.Pad, 0, 0);
         actions.Width = s.Width - 2 * s.Pad;
         actions.Height = s.ButtonH;
-        actions.Margin = new Thickness(0, Inset + 2 * s.Pad + s.Tile + extra, 0, 0);
+        actions.BeginAnimation(MarginProperty, null); // a finished expand animation would otherwise hold its value
+        actions.Margin =new Thickness(0, Inset + 2 * s.Pad + s.Tile + extra, 0, 0);
         return extra;
     }
 

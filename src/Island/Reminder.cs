@@ -5,6 +5,7 @@ using System.Windows.Media;
 class IslandNotice
 {
     public string Key, Title, Detail, Time, YesLabel, NoLabel; // a null NoLabel reads "Not yet"
+    public string More; // full text shown when the island is clicked; null means it can't expand
     public Geometry Icon;
     public ImageSource Logo; // replaces Icon when set
     public Color Accent;

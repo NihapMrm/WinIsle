@@ -71,6 +71,7 @@ static class Checks
         add("Chat", new[] { "Bob", "latest" });
         var first = n.Due();
         if (first.Title != "Chat" || first.Detail != "2 new · Bob latest") fails++;
+        if (first.More != "Ann: hello there\nBob: latest") fails++; // clicking a merged group lists every message
         if (n.StillCurrent(first)) fails++;
         var second = n.Due();
         if (second.Title != "Invoice" || second.Detail != "Mail") fails++;
@@ -104,7 +105,9 @@ static class Checks
         var small = IslandWindow.Small;
         if (regular.Width != 430 || regular.OpenH != 126 || regular.OpenR != 34) fails++;
         if (small.Width != 360 || small.OpenH != 104 || small.OpenR != 28) fails++;
-        if (!single.Small || new WaterReminder(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero).Due().Small) fails++;
+        var water = new WaterReminder(TimeSpan.Zero, TimeSpan.Zero, TimeSpan.Zero).Due();
+        if (!single.Small || water.Small) fails++;
+        if (single.More != single.Detail || water.More != null) fails++; // only notifications expand
 
         // Open: exe-path ids launch the exe; every other id goes through the Apps folder.
         var explorerPath = Path.Combine(Environment.GetEnvironmentVariable("WINDIR"), "explorer.exe").Replace('\\', '/');

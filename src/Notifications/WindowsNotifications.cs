@@ -146,21 +146,23 @@ class WindowsNotifications : IReminder
     static IslandNotice Build(List<Incoming> group)
     {
         var last = group[group.Count - 1];
-        string title, detail;
+        string title, detail, more;
         if (group.Count > 1)
         {
             title = last.App;
             detail = group.Count + " new · " + string.Join(" ", last.Lines);
+            more = string.Join("\n", group.Select(i => i.Lines.Length == 0 ? i.App
+                : i.Lines.Length == 1 ? i.Lines[0] : i.Lines[0] + ": " + string.Join(" ", i.Lines.Skip(1))));
         }
         else
         {
             var body = string.Join(" ", last.Lines.Skip(1));
             title = last.Lines.Length > 0 ? last.Lines[0] : last.App;
-            detail = body == "" ? last.App : last.App + " · " + body;
+            detail = more = body == "" ? last.App : last.App + " · " + body;
         }
         return new IslandNotice
         {
-            Key = last.AppId, Title = title, Detail = detail, YesLabel = "Open", NoLabel = "Dismiss",
+            Key = last.AppId, Title = title, Detail = detail, More = more, YesLabel = "Open", NoLabel = "Dismiss",
             Time = Prayers.Now.ToString("h:mm tt", CultureInfo.InvariantCulture), Icon = Bell, Logo = AppIcon.For(last.AppId), Accent = Accent, Sound = IslandSound.Notify, Small = true, Sticky = IsCall(last),
         };
     }
