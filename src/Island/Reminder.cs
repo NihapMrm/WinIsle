@@ -9,6 +9,7 @@ class IslandNotice
     public ImageSource Logo; // replaces Icon when set
     public Color Accent;
     public bool Small; // uses the smaller open island
+    public bool Sticky; // stays until a button is clicked, even over a higher-priority reminder
     public System.Media.SoundPlayer Sound; // plays as the island appears; null uses IslandSound.Appear
 }
 

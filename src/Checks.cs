@@ -86,6 +86,19 @@ static class Checks
         if (settings == null || settings.PixelWidth != 96) fails++;
         if (AppIcon.For("MyTodo.NoSuchApp") != null || AppIcon.For("") != null || single.Logo != null) fails++;
 
+        // A call jumps the queue, never merges, and survives expiry until answered. Normal and missed ones expire.
+        add("Chat", new[] { "Ann", "see you soon" });
+        add("Chat", new[] { "Ben", "Incoming voice call" });
+        n.Answer(single, false);
+        var call = n.Due();
+        if (call.Title != "Ben" || !call.Sticky || !n.StillCurrent(call) || n.Due() != call) fails++;
+        n.Answer(call, false);
+        var message = n.Due();
+        if (message.Title != "Ann" || message.Sticky || n.StillCurrent(message)) fails++;
+        Func<string[], bool> isCall = lines => WindowsNotifications.IsCall(new WindowsNotifications.Incoming { Lines = lines });
+        if (!isCall(new[] { "Ann", "Video call" }) || !isCall(new[] { "Ann is calling" })) fails++;
+        if (isCall(new[] { "Missed voice call" }) || isCall(new[] { "Ann", "lunch tomorrow?" }) || isCall(new[] { "Ann", new string('x', 40) + " video call" })) fails++;
+
         // Prayer and water keep the regular island; only notifications are small.
         var regular = IslandWindow.Regular;
         var small = IslandWindow.Small;

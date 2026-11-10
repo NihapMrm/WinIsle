@@ -220,7 +220,7 @@ class IslandWindow : GlassWindow
         {
             if (!open) return;
             // A higher-priority reminder takes over; this one stays due and returns afterwards.
-            if ((due != null && dueIndex < shownIndex) || !reminders[shownIndex].StillCurrent(shown)) Dismiss();
+            if ((due != null && dueIndex < shownIndex && !shown.Sticky) || !reminders[shownIndex].StillCurrent(shown)) Dismiss();
             return;
         }
         if (due != null) Present(due, dueIndex);

@@ -21,6 +21,9 @@ class WindowsNotifications : IReminder
     internal const string SettingsKey = @"Software\Microsoft\Windows\CurrentVersion\Notifications\Settings";
     internal const string BannerValue = "ShowBanner";
 
+    static readonly System.Text.RegularExpressions.Regex CallWords = new System.Text.RegularExpressions.Regex(
+        @"\b(incoming\b.*\bcall|voice call|video call|calling)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
     static readonly TimeSpan Visible = TimeSpan.FromSeconds(6);
     static readonly Color Accent = Color.FromRgb(180, 170, 255);
     static readonly Geometry Bell = Geometry.Parse("M12,2 C8.7,2 6,4.7 6,8 V12 L4,16 H20 L18,12 V8 C18,4.7 15.3,2 12,2 Z M9.5,18 A2.5,2.5 0 0 0 14.5,18 Z");
@@ -124,11 +127,20 @@ class WindowsNotifications : IReminder
         while (incoming.TryDequeue(out item)) waiting.Add(item);
         if (current != null && DateTime.UtcNow >= until) current = null; // ran out while a prayer or water reminder took over
         if (current != null || waiting.Count == 0) return current;
-        var group = waiting.Where(x => x.App == waiting[0].App).ToList();
+        var head = waiting.FirstOrDefault(IsCall) ?? waiting[0]; // a call goes ahead of the queue and never merges
+        var group = IsCall(head) ? new List<Incoming> { head } : waiting.Where(x => x.App == head.App && !IsCall(x)).ToList();
         waiting.RemoveAll(group.Contains);
         current = Build(group);
         until = DateTime.MaxValue; // the clock starts when the island first asks StillCurrent
         return current;
+    }
+
+    // ponytail: listeners can't see a toast's call flag, so this reads English text. Other languages close
+    // normally, and a short chat line that sounds like a call stays until Dismiss.
+    internal static bool IsCall(Incoming item)
+    {
+        return !item.Lines.Any(l => l.IndexOf("missed", StringComparison.OrdinalIgnoreCase) >= 0)
+            && item.Lines.Any(l => l.Length <= 40 && CallWords.IsMatch(l));
     }
 
     static IslandNotice Build(List<Incoming> group)
@@ -149,12 +161,13 @@ class WindowsNotifications : IReminder
         return new IslandNotice
         {
             Key = last.AppId, Title = title, Detail = detail, YesLabel = "Open", NoLabel = "Dismiss",
-            Time = Prayers.Now.ToString("h:mm tt", CultureInfo.InvariantCulture), Icon = Bell, Logo = AppIcon.For(last.AppId), Accent = Accent, Sound = IslandSound.Notify, Small = true,
+            Time = Prayers.Now.ToString("h:mm tt", CultureInfo.InvariantCulture), Icon = Bell, Logo = AppIcon.For(last.AppId), Accent = Accent, Sound = IslandSound.Notify, Small = true, Sticky = IsCall(last),
         };
     }
 
     public bool StillCurrent(IslandNotice shown)
     {
+        if (shown.Sticky) return true;
         if (until == DateTime.MaxValue) until = DateTime.UtcNow + visible;
         if (DateTime.UtcNow < until) return true;
         current = null;
