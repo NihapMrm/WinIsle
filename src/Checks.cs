@@ -30,7 +30,25 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures();
+    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures();
+    }
+
+    // Media: shown while playing and briefly after pausing; the bar moves on between reads but never past the end.
+    static int MediaFailures()
+    {
+        int fails = 0;
+        var t0 = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
+        if (!MediaSession.Visible(true, DateTime.MinValue, t0)) fails++;
+        if (!MediaSession.Visible(false, t0, t0 + MediaSession.KeepPaused - TimeSpan.FromSeconds(1))) fails++;
+        if (MediaSession.Visible(false, t0, t0 + MediaSession.KeepPaused)) fails++;
+        var at = new DateTimeOffset(t0);
+        var song = new MediaInfo { Playing = true, Position = TimeSpan.FromSeconds(60), End = TimeSpan.FromSeconds(200), Updated = at };
+        if (MediaSession.PositionAt(song, at.AddSeconds(5)) != TimeSpan.FromSeconds(65)) fails++;
+        if (MediaSession.PositionAt(song, at.AddMinutes(10)) != song.End) fails++;
+        song.Playing = false;
+        if (MediaSession.PositionAt(song, at.AddSeconds(5)) != TimeSpan.FromSeconds(60)) fails++;
+        if (MediaSession.Clock(TimeSpan.FromSeconds(185)) != "3:05" || MediaSession.Clock(TimeSpan.FromSeconds(3723)) != "1:02:03" || MediaSession.Clock(TimeSpan.Zero) != "0:00") fails++;
+        return fails;
     }
 
     // Hiding sets the value only on keys that exist; restoring clears it everywhere, including nested ids.

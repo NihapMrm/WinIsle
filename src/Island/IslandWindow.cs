@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -8,6 +9,7 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 
 // Dynamic Island style pill at the top centre of the screen. Knows nothing about prayers or water.
@@ -23,10 +25,19 @@ class IslandWindow : GlassWindow
     class SpringValue { public double X, V, To; }
 
     const double Stiffness = 260, Damping = 24; // slightly underdamped: a small settle, no wobble
-    const double WinW = 500, WinH = 420, Inset = 2, BlurMargin = 40; // tall enough for an expanded notification; empty pixels pass clicks through
+    // The window starts at the top of the screen so the media pill can tuck above it; Inset puts reminders 8 px down.
+    const double WinW = 500, WinH = 420, Inset = 8, BlurMargin = 40; // tall enough for an expanded notification; empty pixels pass clicks through
     const int ExpandedLines = 16;
     const double SeedW = 76, SeedH = 26;
     const double CompactW = 244, CompactH = 44;
+    // Media: a pill tucked above the screen edge with PeekShown px showing, opening into a player on hover.
+    const double PeekW = 150, PeekH = 20, PeekShown = 6, PeekTop = PeekShown - Inset - PeekH, GoneTop = -(Inset + PeekH + 4);
+    const double MediaW = 380, MediaH = 160, MediaR = 30, MediaPad = 14;
+
+    static readonly Geometry PlayIcon = Geometry.Parse("M7,4.5 L19.5,12 L7,19.5 Z");
+    static readonly Geometry PauseIcon = Geometry.Parse("M6.5,4.5 H10 V19.5 H6.5 Z M14,4.5 H17.5 V19.5 H14 Z");
+    static readonly Geometry PreviousIcon = Geometry.Parse("M6,5 H8 V19 H6 Z M19,5 L9.5,12 L19,19 Z");
+    static readonly Geometry NextIcon = Geometry.Parse("M16,5 H18 V19 H16 Z M5,5 L14.5,12 L5,19 Z");
 
     // The open island's dimensions. Corner radius = button radius + padding, so the curves are concentric.
     internal class IslandSize
@@ -40,7 +51,8 @@ class IslandWindow : GlassWindow
     internal static readonly IslandSize Small = new IslandSize { Width = 360, Pad = 12, Tile = 36, ButtonH = 32, Gap = 10, TitleFont = 16, DetailFont = 11.5, LineH = 15.5, TextW = 206, IconSize = 20, ButtonFont = 12.5 };
 
     readonly IReminder[] reminders; // highest priority first
-    readonly SpringValue w = new SpringValue(), h = new SpringValue(), r = new SpringValue();
+    readonly MediaSession media;    // null in demos
+    readonly SpringValue w = new SpringValue(), h = new SpringValue(), r = new SpringValue(), y = new SpringValue();
     readonly Border pill = new Border();
     readonly Image backdrop = new Image { Stretch = Stretch.Fill, Margin = new Thickness(-BlurMargin), Effect = new BlurEffect { Radius = 36, RenderingBias = RenderingBias.Performance } };
     readonly Grid stage = new Grid { Opacity = 0 };
@@ -64,6 +76,22 @@ class IslandWindow : GlassWindow
     TextBlock yesLabel, noLabel;
     Border yesButton, noButton;
 
+    // Media player parts.
+    readonly Border art = new Border { Width = 56, Height = 56, CornerRadius = new CornerRadius(12), HorizontalAlignment = HorizontalAlignment.Left };
+    readonly TextBlock mediaTitle = new TextBlock { FontSize = 15, FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly TextBlock mediaArtist = new TextBlock { FontSize = 12.5, Opacity = 0.7, TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly Image mediaApp = new Image { Width = 18, Height = 18, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(8, 2, 0, 0) };
+    readonly TextBlock elapsed = new TextBlock { FontSize = 11, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center };
+    readonly TextBlock remaining = new TextBlock { FontSize = 11, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+    readonly Grid seekTrack = new Grid { Background = Brushes.Transparent, Cursor = Cursors.Hand, Margin = new Thickness(8, 0, 8, 0) };
+    readonly Border seekFill = new Border { Height = 4, Width = 0, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.FromArgb(235, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
+    readonly System.Windows.Shapes.Path playGlyph = new System.Windows.Shapes.Path { Data = PlayIcon, Width = 16, Height = 16, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Color.FromRgb(18, 18, 20)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    Grid mediaLayer, timeline;
+    MediaInfo mediaNow;   // last snapshot shown
+    byte[] artBytes;      // whose image art shows
+    bool mediaShown;      // peek or player is on screen
+    bool mediaOpen;       // the player is open under the mouse
+
     IntPtr hwnd;
     double dpi = 1;
     bool looping, open;
@@ -77,8 +105,9 @@ class IslandWindow : GlassWindow
     // Raised after the island has gone following a yes answer.
     internal event Action Confirmed;
 
-    internal IslandWindow(params IReminder[] reminders)
+    internal IslandWindow(MediaSession media, params IReminder[] reminders)
     {
+        this.media = media;
         this.reminders = reminders;
         Title = "Reminder";
         Width = WinW; Height = WinH;
@@ -93,7 +122,7 @@ class IslandWindow : GlassWindow
         Foreground = new SolidColorBrush(Text);
         var area = SystemParameters.WorkArea;
         Left = area.Left + (area.Width - WinW) / 2;
-        Top = area.Top + 6;
+        Top = area.Top;
 
         pill.HorizontalAlignment = HorizontalAlignment.Center;
         pill.VerticalAlignment = VerticalAlignment.Top;
@@ -140,8 +169,8 @@ class IslandWindow : GlassWindow
         actions.ColumnDefinitions.Add(new ColumnDefinition());
         actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
         actions.ColumnDefinitions.Add(new ColumnDefinition());
-        var notYet = MakeButton("Not yet", Color.FromArgb(38, 255, 255, 255), Color.FromArgb(64, 255, 255, 255), Colors.White, () => Answer(false));
-        var yes = MakeButton("Yes", Green, Color.FromRgb(76, 224, 112), Color.FromRgb(4, 40, 16), () => Answer(true));
+        var notYet = MakeButton(Label("Not yet", Colors.White), Color.FromArgb(38, 255, 255, 255), Color.FromArgb(64, 255, 255, 255), () => Answer(false));
+        var yes = MakeButton(Label("Yes", Color.FromRgb(4, 40, 16)), Green, Color.FromRgb(76, 224, 112), () => Answer(true));
         yesLabel = (TextBlock)yes.Child;
         noLabel = (TextBlock)notYet.Child;
         yesButton = yes;
@@ -150,16 +179,23 @@ class IslandWindow : GlassWindow
         actions.Children.Add(notYet);
         actions.Children.Add(yes);
 
+        mediaLayer = BuildPlayer();
+
         var content = new Grid { Width = WinW, Height = WinH, Clip = clip };
         content.Children.Add(compact);
         content.Children.Add(header);
         content.Children.Add(actions);
+        content.Children.Add(mediaLayer);
         var glass = new Grid { Width = WinW, Height = WinH, Clip = clip }; // clip outside the blur so the edge stays crisp
         glass.Children.Add(backdrop);
         stage.Children.Add(glass);
         stage.Children.Add(pill);
         stage.Children.Add(content);
         Content = stage;
+
+        // Hovering the peek opens the player; leaving puts it back.
+        MouseEnter += (s, e) => { if (shown == null && mediaShown && !mediaOpen) OpenPlayer(); };
+        MouseLeave += (s, e) => After(350, () => { if (mediaOpen && !IsMouseOver) ClosePlayer(); });
 
         SourceInitialized += (s, e) =>
         {
@@ -188,7 +224,12 @@ class IslandWindow : GlassWindow
         return new System.Windows.Shapes.Path { Width = size, Height = size, Stretch = Stretch.Uniform };
     }
 
-    static Border MakeButton(string label, Color rest, Color hover, Color ink, Action click)
+    static TextBlock Label(string text, Color ink)
+    {
+        return new TextBlock { Text = text, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(ink), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    }
+
+    static Border MakeButton(UIElement child, Color rest, Color hover, Action click)
     {
         var fill = new SolidColorBrush(rest);
         var scale = new ScaleTransform(1, 1);
@@ -196,7 +237,7 @@ class IslandWindow : GlassWindow
         {
             Background = fill, Cursor = Cursors.Hand,
             RenderTransform = scale, RenderTransformOrigin = new Point(0.5, 0.5),
-            Child = new TextBlock { Text = label, FontWeight = FontWeights.SemiBold, Foreground = new SolidColorBrush(ink), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center },
+            Child = child,
         };
         Action<double, int> press = (to, ms) =>
         {
@@ -208,6 +249,72 @@ class IslandWindow : GlassWindow
         b.MouseLeftButtonDown += (s, e) => press(0.94, 140);
         b.MouseLeftButtonUp += (s, e) => { press(1, 280); click(); };
         return b;
+    }
+
+    static Border RoundButton(UIElement glyph, double diameter, Color rest, Color hover, Action click)
+    {
+        var b = MakeButton(glyph, rest, hover, click);
+        b.Width = b.Height = diameter;
+        b.CornerRadius = new CornerRadius(diameter / 2);
+        return b;
+    }
+
+    static System.Windows.Shapes.Path Glyph(Geometry icon)
+    {
+        return new System.Windows.Shapes.Path { Data = icon, Width = 16, Height = 16, Stretch = Stretch.Uniform, Fill = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    }
+
+    // Art and names, the timeline, then previous / play-pause / next.
+    Grid BuildPlayer()
+    {
+        var layer = Layer(MediaW - 2 * MediaPad, MediaH - 2 * MediaPad, MediaPad); // the open player starts at the screen edge, not at Inset
+        var column = new StackPanel();
+
+        var track = new Grid { Height = 56 };
+        track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(68) });
+        track.ColumnDefinitions.Add(new ColumnDefinition());
+        track.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        names.Children.Add(mediaTitle);
+        names.Children.Add(mediaArtist);
+        Grid.SetColumn(names, 1);
+        Grid.SetColumn(mediaApp, 2);
+        RenderOptions.SetBitmapScalingMode(mediaApp, BitmapScalingMode.HighQuality);
+        track.Children.Add(art);
+        track.Children.Add(names);
+        track.Children.Add(mediaApp);
+        column.Children.Add(track);
+
+        timeline = new Grid { Height = 16, Margin = new Thickness(0, 12, 0, 8) };
+        timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+        timeline.ColumnDefinitions.Add(new ColumnDefinition());
+        timeline.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(40) });
+        seekTrack.Children.Add(new Border { Height = 4, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.FromArgb(55, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Center });
+        seekTrack.Children.Add(seekFill);
+        seekTrack.MouseLeftButtonUp += (s, e) => SeekTo(e.GetPosition(seekTrack).X / seekTrack.ActualWidth);
+        Grid.SetColumn(seekTrack, 1);
+        Grid.SetColumn(remaining, 2);
+        timeline.Children.Add(elapsed);
+        timeline.Children.Add(seekTrack);
+        timeline.Children.Add(remaining);
+        column.Children.Add(timeline);
+
+        var clear = Color.FromArgb(0, 255, 255, 255);
+        var dim = Color.FromArgb(40, 255, 255, 255);
+        var controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Height = 40 };
+        var play = RoundButton(playGlyph, 40, Color.FromArgb(235, 255, 255, 255), Colors.White, () =>
+        {
+            playGlyph.Data = playGlyph.Data == PauseIcon ? PlayIcon : PauseIcon; // flips at once; the next read confirms
+            media.PlayPause();
+        });
+        play.Margin = new Thickness(18, 0, 18, 0);
+        controls.Children.Add(RoundButton(Glyph(PreviousIcon), 36, clear, dim, () => media.Previous()));
+        controls.Children.Add(play);
+        controls.Children.Add(RoundButton(Glyph(NextIcon), 36, clear, dim, () => media.Next()));
+        column.Children.Add(controls);
+
+        layer.Children.Add(column);
+        return layer;
     }
 
     // ---- schedule ----
@@ -228,7 +335,14 @@ class IslandWindow : GlassWindow
             if ((due != null && dueIndex < shownIndex && !shown.Sticky) || !reminders[shownIndex].StillCurrent(shown)) Dismiss();
             return;
         }
-        if (due != null) Present(due, dueIndex);
+        // Reminders wait while the player is open under the mouse; calls don't.
+        if (due != null && (!mediaOpen || due.Sticky))
+        {
+            if (mediaShown) HidePlayer(false);
+            Present(due, dueIndex);
+            return;
+        }
+        UpdatePlayer();
     }
 
     internal void Answer(bool yes)
@@ -281,7 +395,7 @@ class IslandWindow : GlassWindow
         SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13); // back on top of other topmost windows: NOSIZE | NOMOVE | NOACTIVATE
         CaptureBackdrop();
         (notice.Sound ?? IslandSound.Appear).Play();
-        Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2);
+        Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2); Jump(y, 0);
         Morph(CompactW, CompactH, CompactH / 2);
         Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);
         Reveal(compact, 90);
@@ -333,7 +447,7 @@ class IslandWindow : GlassWindow
         actions.Width = s.Width - 2 * s.Pad;
         actions.Height = s.ButtonH;
         actions.BeginAnimation(MarginProperty, null); // a finished expand animation would otherwise hold its value
-        actions.Margin =new Thickness(0, Inset + 2 * s.Pad + s.Tile + extra, 0, 0);
+        actions.Margin = new Thickness(0, Inset + 2 * s.Pad + s.Tile + extra, 0, 0);
         return extra;
     }
 
@@ -355,6 +469,122 @@ class IslandWindow : GlassWindow
         });
     }
 
+    // ---- media player ----
+
+    void UpdatePlayer()
+    {
+        var now = media == null ? null : media.Now;
+        if (now == null) { if (mediaShown) HidePlayer(true); return; }
+        if (!mediaShown) ShowPeek();
+        Fill(now);
+    }
+
+    // Slides down from above the screen until only PeekShown px show.
+    void ShowPeek()
+    {
+        mediaShown = true;
+        SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13);
+        CaptureBackdrop();
+        Jump(w, PeekW); Jump(h, PeekH); Jump(r, PeekH / 2); Jump(y, GoneTop);
+        ApplyShape();
+        stage.BeginAnimation(OpacityProperty, null);
+        stage.Opacity = 1;
+        Morph(PeekW, PeekH, PeekH / 2, PeekTop);
+    }
+
+    void OpenPlayer()
+    {
+        mediaOpen = true;
+        CaptureBackdrop();
+        if (mediaNow != null) Fill(mediaNow);
+        // Flush with the screen's top edge: the top corners sit above the screen, so the player hangs from the lid.
+        Morph(MediaW, MediaH + MediaR, MediaR, -Inset - MediaR);
+        Reveal(mediaLayer, 120);
+    }
+
+    void ClosePlayer()
+    {
+        mediaOpen = false;
+        Conceal(mediaLayer);
+        Morph(PeekW, PeekH, PeekH / 2, PeekTop);
+    }
+
+    // Animated: slides back up out of sight. Instant: makes way for a reminder.
+    void HidePlayer(bool animate)
+    {
+        mediaShown = mediaOpen = false;
+        Conceal(mediaLayer);
+        if (!animate)
+        {
+            stage.BeginAnimation(OpacityProperty, null);
+            stage.Opacity = 0;
+            return;
+        }
+        Morph(PeekW, PeekH, PeekH / 2, GoneTop);
+        After(450, () =>
+        {
+            if (mediaShown || shown != null) return;
+            StopLoop();
+            stage.BeginAnimation(OpacityProperty, null);
+            stage.Opacity = 0;
+            backdrop.Source = null;
+        });
+    }
+
+    void Fill(MediaInfo m)
+    {
+        mediaNow = m;
+        mediaTitle.Text = m.Title == "" ? "Playing" : m.Title;
+        mediaArtist.Text = m.Artist;
+        mediaTitle.MaxWidth = mediaArtist.MaxWidth = MediaW - 2 * MediaPad - 68 - 26;
+        if (m.Art != artBytes || art.Background == null)
+        {
+            artBytes = m.Art;
+            var image = Decode(m.Art);
+            art.Background = image == null ? (Brush)new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)) : new ImageBrush(image) { Stretch = Stretch.UniformToFill };
+        }
+        mediaApp.Source = AppIcon.For(m.AppId ?? "");
+        playGlyph.Data = m.Playing ? PauseIcon : PlayIcon;
+
+        bool timed = m.End > TimeSpan.Zero;
+        timeline.Visibility = timed ? Visibility.Visible : Visibility.Hidden; // some players report no length
+        // Only while open: animating redraws the whole see-through window, which is costly to keep up behind the peek.
+        if (!timed || !mediaOpen) return;
+        var position = MediaSession.PositionAt(m, DateTimeOffset.Now);
+        elapsed.Text = MediaSession.Clock(position);
+        remaining.Text = "-" + MediaSession.Clock(m.End - position);
+        // Glide to where the bar will be in a second, so it moves smoothly between reads.
+        var ahead = MediaSession.PositionAt(m, DateTimeOffset.Now.AddSeconds(1));
+        seekFill.BeginAnimation(WidthProperty, new DoubleAnimation(ahead.Ticks / (double)m.End.Ticks * seekTrack.ActualWidth, TimeSpan.FromSeconds(1)));
+    }
+
+    void SeekTo(double fraction)
+    {
+        var m = mediaNow;
+        if (m == null || m.End <= TimeSpan.Zero || double.IsNaN(fraction)) return;
+        fraction = Math.Max(0, Math.Min(1, fraction));
+        seekFill.BeginAnimation(WidthProperty, null);
+        seekFill.Width = fraction * seekTrack.ActualWidth;
+        media.Seek(TimeSpan.FromTicks((long)(fraction * m.End.Ticks)));
+    }
+
+    static ImageSource Decode(byte[] bytes)
+    {
+        if (bytes == null) return null;
+        try
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.DecodePixelWidth = 112;
+            image.StreamSource = new MemoryStream(bytes);
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+        catch (Exception) { return null; } // a bad cover shows the plain tile
+    }
+
     // ponytail: glass is a blurred snapshot taken as the island appears, so it won't follow
     // windows moving behind it. Live refresh = SetWindowDisplayAffinity(exclude) + a recapture timer.
     void CaptureBackdrop()
@@ -365,7 +595,7 @@ class IslandWindow : GlassWindow
             using (var g = System.Drawing.Graphics.FromImage(bmp))
                 g.CopyFromScreen((int)((Left - BlurMargin) * dpi), (int)((Top - BlurMargin) * dpi), 0, 0, bmp.Size);
             var handle = bmp.GetHbitmap();
-            backdrop.Source = Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, System.Windows.Media.Imaging.BitmapSizeOptions.FromEmptyOptions());
+            backdrop.Source = Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
             DeleteObject(handle);
         }
     }
@@ -399,9 +629,10 @@ class IslandWindow : GlassWindow
 
     static void Jump(SpringValue s, double x) { s.X = s.To = x; s.V = 0; }
 
-    void Morph(double width, double height, double radius)
+    // top moves the pill up from its resting place; the media peek uses it to tuck above the screen.
+    void Morph(double width, double height, double radius, double top = 0)
     {
-        w.To = width; h.To = height; r.To = radius;
+        w.To = width; h.To = height; r.To = radius; y.To = top;
         if (looping) return;
         looping = true;
         lastFrame = TimeSpan.Zero;
@@ -420,14 +651,15 @@ class IslandWindow : GlassWindow
         if (now == lastFrame) return; // WPF can raise Rendering more than once per frame
         double dt = lastFrame == TimeSpan.Zero ? 1 / 60.0 : Math.Min((now - lastFrame).TotalSeconds, 1 / 30.0);
         lastFrame = now;
-        foreach (var s in new[] { w, h, r })
+        var springs = new[] { w, h, r, y };
+        foreach (var s in springs)
             for (int i = 0; i < 4; i++) // substeps keep the spring stable on a slow frame
             {
                 s.V += (-Stiffness * (s.X - s.To) - Damping * s.V) * dt / 4;
                 s.X += s.V * dt / 4;
             }
-        bool settled = new[] { w, h, r }.All(s => Math.Abs(s.X - s.To) < 0.2 && Math.Abs(s.V) < 2);
-        if (settled) { Jump(w, w.To); Jump(h, h.To); Jump(r, r.To); }
+        bool settled = springs.All(s => Math.Abs(s.X - s.To) < 0.2 && Math.Abs(s.V) < 2);
+        if (settled) foreach (var s in springs) Jump(s, s.To);
         ApplyShape();
         if (settled) StopLoop();
     }
@@ -437,7 +669,8 @@ class IslandWindow : GlassWindow
         pill.Width = w.X;
         pill.Height = h.X;
         pill.CornerRadius = new CornerRadius(r.X);
-        clip.Rect = new Rect((WinW - w.X) / 2, Inset, w.X, h.X);
+        pill.Margin = new Thickness(0, Inset + y.X, 0, 0);
+        clip.Rect = new Rect((WinW - w.X) / 2, Inset + y.X, w.X, h.X);
         clip.RadiusX = clip.RadiusY = r.X;
     }
 }
