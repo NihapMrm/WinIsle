@@ -33,14 +33,11 @@ static class Checks
     return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures();
     }
 
-    // Media: shown while playing and briefly after pausing; the bar moves on between reads but never past the end.
+    // Media: the bar moves on between reads but never past the end, and stops while paused.
     static int MediaFailures()
     {
         int fails = 0;
         var t0 = new DateTime(2026, 11, 10, 12, 0, 0, DateTimeKind.Utc);
-        if (!MediaSession.Visible(true, DateTime.MinValue, t0)) fails++;
-        if (!MediaSession.Visible(false, t0, t0 + MediaSession.KeepPaused - TimeSpan.FromSeconds(1))) fails++;
-        if (MediaSession.Visible(false, t0, t0 + MediaSession.KeepPaused)) fails++;
         var at = new DateTimeOffset(t0);
         var song = new MediaInfo { Playing = true, Position = TimeSpan.FromSeconds(60), End = TimeSpan.FromSeconds(200), Updated = at };
         if (MediaSession.PositionAt(song, at.AddSeconds(5)) != TimeSpan.FromSeconds(65)) fails++;

@@ -34,7 +34,8 @@ class IslandWindow : GlassWindow
     const double PeekW = 150, PeekH = 20, PeekShown = 6, PeekTop = PeekShown - Inset - PeekH, GoneTop = -(Inset + PeekH + 4);
     const double MediaW = 380, MediaH = 160, MediaR = 30, MediaPad = 14;
 
-    static readonly Geometry PlayIcon = Geometry.Parse("M7,4.5 L19.5,12 L7,19.5 Z");
+    static readonly MediaInfo Idle = new MediaInfo { Title = "Nothing playing", Artist = "", AppId = "" };
+    static readonly Geometry PlayIcon =Geometry.Parse("M7,4.5 L19.5,12 L7,19.5 Z");
     static readonly Geometry PauseIcon = Geometry.Parse("M6.5,4.5 H10 V19.5 H6.5 Z M14,4.5 H17.5 V19.5 H14 Z");
     static readonly Geometry PreviousIcon = Geometry.Parse("M6,5 H8 V19 H6 Z M19,5 L9.5,12 L19,19 Z");
     static readonly Geometry NextIcon = Geometry.Parse("M16,5 H18 V19 H16 Z M5,5 L14.5,12 L5,19 Z");
@@ -338,7 +339,7 @@ class IslandWindow : GlassWindow
         // Reminders wait while the player is open under the mouse; calls don't.
         if (due != null && (!mediaOpen || due.Sticky))
         {
-            if (mediaShown) HidePlayer(false);
+            if (mediaShown) HidePlayer();
             Present(due, dueIndex);
             return;
         }
@@ -471,12 +472,12 @@ class IslandWindow : GlassWindow
 
     // ---- media player ----
 
+    // The peek is always there (except in demos); with no media session it opens to "Nothing playing".
     void UpdatePlayer()
     {
-        var now = media == null ? null : media.Now;
-        if (now == null) { if (mediaShown) HidePlayer(true); return; }
+        if (media == null) return;
         if (!mediaShown) ShowPeek();
-        Fill(now);
+        Fill(media.Now ?? Idle);
     }
 
     // Slides down from above the screen until only PeekShown px show.
@@ -509,26 +510,13 @@ class IslandWindow : GlassWindow
         Morph(PeekW, PeekH, PeekH / 2, PeekTop);
     }
 
-    // Animated: slides back up out of sight. Instant: makes way for a reminder.
-    void HidePlayer(bool animate)
+    // Makes way for a reminder; the peek slides back in once it's gone.
+    void HidePlayer()
     {
         mediaShown = mediaOpen = false;
         Conceal(mediaLayer);
-        if (!animate)
-        {
-            stage.BeginAnimation(OpacityProperty, null);
-            stage.Opacity = 0;
-            return;
-        }
-        Morph(PeekW, PeekH, PeekH / 2, GoneTop);
-        After(450, () =>
-        {
-            if (mediaShown || shown != null) return;
-            StopLoop();
-            stage.BeginAnimation(OpacityProperty, null);
-            stage.Opacity = 0;
-            backdrop.Source = null;
-        });
+        stage.BeginAnimation(OpacityProperty, null);
+        stage.Opacity = 0;
     }
 
     void Fill(MediaInfo m)

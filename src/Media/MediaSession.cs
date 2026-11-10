@@ -21,13 +21,11 @@ class MediaInfo
 // WinRT objects stay on one background thread: they failed when used from another thread.
 class MediaSession
 {
-    internal static readonly TimeSpan KeepPaused = TimeSpan.FromMinutes(2);
-
     readonly ConcurrentQueue<Action<Session>> commands = new ConcurrentQueue<Action<Session>>();
     readonly AutoResetEvent wake = new AutoResetEvent(false);
     volatile MediaInfo now;
 
-    internal MediaInfo Now { get { return now; } } // null when nothing is playing or recently paused
+    internal MediaInfo Now { get { return now; } } // playing or paused; null when no app has a media session
 
     internal static MediaSession Live()
     {
@@ -42,12 +40,6 @@ class MediaSession
     internal void Seek(TimeSpan to) { Send(s => s.TryChangePlaybackPositionAsync(to.Ticks)); }
 
     void Send(Action<Session> command) { commands.Enqueue(command); wake.Set(); }
-
-    // Shown while playing, and for a while after pausing so it can be resumed from the island.
-    internal static bool Visible(bool playing, DateTime lastPlaying, DateTime utcNow)
-    {
-        return playing || utcNow - lastPlaying < KeepPaused;
-    }
 
     // Position moves on while playing; the session only reports it now and then.
     internal static TimeSpan PositionAt(MediaInfo m, DateTimeOffset at)
@@ -68,7 +60,6 @@ class MediaSession
         GlobalSystemMediaTransportControlsSessionManager manager = null;
         string trackKey = null;
         byte[] art = null;
-        var lastPlaying = DateTime.MinValue;
         while (true)
         {
             try
@@ -88,19 +79,15 @@ class MediaSession
                 if (session != null)
                 {
                     var playing = session.GetPlaybackInfo().PlaybackStatus == GlobalSystemMediaTransportControlsSessionPlaybackStatus.Playing;
-                    if (playing) lastPlaying = DateTime.UtcNow;
-                    if (Visible(playing, lastPlaying, DateTime.UtcNow))
+                    var props = Wait(session.TryGetMediaPropertiesAsync());
+                    var key = session.SourceAppUserModelId + "\n" + props.Title + "\n" + props.Artist;
+                    if (key != trackKey) { trackKey = key; art = ReadArt(props.Thumbnail); }
+                    var timeline = session.GetTimelineProperties();
+                    next = new MediaInfo
                     {
-                        var props = Wait(session.TryGetMediaPropertiesAsync());
-                        var key = session.SourceAppUserModelId + "\n" + props.Title + "\n" + props.Artist;
-                        if (key != trackKey) { trackKey = key; art = ReadArt(props.Thumbnail); }
-                        var timeline = session.GetTimelineProperties();
-                        next = new MediaInfo
-                        {
-                            Title = props.Title, Artist = props.Artist, AppId = session.SourceAppUserModelId, Art = art, Playing = playing,
-                            Position = timeline.Position, End = timeline.EndTime, Updated = timeline.LastUpdatedTime,
-                        };
-                    }
+                        Title = props.Title, Artist = props.Artist, AppId = session.SourceAppUserModelId, Art = art, Playing = playing,
+                        Position = timeline.Position, End = timeline.EndTime, Updated = timeline.LastUpdatedTime,
+                    };
                 }
                 now = next;
             }
