@@ -12,6 +12,7 @@ class IslandNotice
     public bool Small; // uses the smaller open island
     public bool Sticky; // stays until a button is clicked, even over a higher-priority reminder
     public System.Media.SoundPlayer Sound; // plays as the island appears; null uses IslandSound.Appear
+    public bool LoopSound; // Sound repeats until the island closes
 }
 
 // The two labels of the compact pill after an answer.

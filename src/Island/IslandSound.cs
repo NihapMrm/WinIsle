@@ -12,7 +12,9 @@ static class IslandSound
     public static readonly SoundPlayer Appear = Load(Wav(0.32, 800, 784, 0, 1175, 110));
     public static readonly SoundPlayer Yes = Load(Wav(0.36, 850, 659, 0, 784, 90, 1047, 180));
     public static readonly SoundPlayer NotYet = Load(Wav(0.24, 500, 587, 0, 440, 90));
-    public static readonly SoundPlayer Notify = Load(Wav(0.26, 600, 1047, 0, 1319, 80));
+    // Alarm clock: four quick beeps then a pause, made to repeat with PlayLooping.
+    public static readonly SoundPlayer Alarm = Load(Beeps(0.5, 1200, 1319, 0, 1319, 160, 1319, 320, 1319, 480));
+    public static readonly SoundPlayer Notify =Load(Wav(0.26, 600, 1047, 0, 1319, 80));
     public static readonly SoundPlayer Water =Load(Drops(0.4, 800, 900, 0, 1250, 170, 760, 340));
 
     static SoundPlayer Load(byte[] wav)
@@ -36,6 +38,18 @@ static class IslandSound
     internal static byte[] Drops(double peak, int ms, params double[] drops)
     {
         return Mix(peak, ms, drops, (hz, t) => Math.Min(t / 0.003, 1) * Math.Exp(-t * 26) * Math.Sin(2 * Math.PI * hz * (t + 6 * t * t)));
+    }
+
+    // Each beep is a 90 ms buzz: odd harmonics give the square-ish alarm-clock tone, with short ramps so it doesn't click.
+    internal static byte[] Beeps(double peak, int ms, params double[] beeps)
+    {
+        const double Length = 0.09;
+        return Mix(peak, ms, beeps, (hz, t) =>
+        {
+            if (t >= Length) return 0;
+            double phase = 2 * Math.PI * hz * t;
+            return Math.Min(t / 0.004, 1) * Math.Min((Length - t) / 0.006, 1) * (Math.Sin(phase) + 0.3 * Math.Sin(3 * phase) + 0.15 * Math.Sin(5 * phase));
+        });
     }
 
     // Adds up one voice per (hertz, start ms) pair and encodes 16-bit mono PCM.

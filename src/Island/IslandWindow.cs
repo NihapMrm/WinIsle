@@ -112,6 +112,7 @@ class IslandWindow : GlassWindow
     bool confirmed;
     bool expanded;       // the notice was clicked open to show all of it
     IslandSize size;     // the shown notice's layout
+    System.Media.SoundPlayer ringing; // a looping sound to stop when the island closes
 
     // Raised after the island has gone following a yes answer.
     internal event Action Confirmed;
@@ -372,6 +373,7 @@ class IslandWindow : GlassWindow
     {
         if (!open) return;
         open = false;
+        StopRinging();
         (yes ? IslandSound.Yes : IslandSound.NotYet).Play();
         glow.BeginAnimation(OpacityProperty, null);
         var result = reminders[shownIndex].Answer(shown, yes);
@@ -417,7 +419,8 @@ class IslandWindow : GlassWindow
         check.Opacity = 0;
         SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13); // back on top of other topmost windows: NOSIZE | NOMOVE | NOACTIVATE
         CaptureBackdrop();
-        (notice.Sound ?? IslandSound.Appear).Play();
+        var sound = notice.Sound ?? IslandSound.Appear;
+        if (notice.LoopSound) { sound.PlayLooping(); ringing = sound; } else sound.Play();
         Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2); Jump(y, 0);
         Morph(CompactW, CompactH, CompactH / 2);
         Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);
@@ -474,9 +477,17 @@ class IslandWindow : GlassWindow
         return extra;
     }
 
+    void StopRinging()
+    {
+        if (ringing == null) return;
+        ringing.Stop();
+        ringing = null;
+    }
+
     void Dismiss()
     {
         open = false;
+        StopRinging(); // closed by itself, e.g. the charger was plugged in
         glow.BeginAnimation(OpacityProperty, null);
         Conceal(compact);
         Conceal(header);

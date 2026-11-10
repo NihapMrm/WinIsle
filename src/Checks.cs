@@ -30,7 +30,38 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures();
+    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures();
+    }
+
+    // Battery: alerts at 15% unplugged and 95% charging, snoozes on Dismiss, and clears when the charger changes.
+    static int BatteryFailures()
+    {
+        int fails = 0;
+        Func<int, bool, BatteryReminder.Power> at = (percent, charging) => new BatteryReminder.Power { Percent = percent, Charging = charging };
+        if (BatteryReminder.Problem(at(15, false)) != "low" || BatteryReminder.Problem(at(16, false)) != null || BatteryReminder.Problem(at(10, true)) != null) fails++;
+        if (BatteryReminder.Problem(at(95, true)) != "full" || BatteryReminder.Problem(at(94, true)) != null || BatteryReminder.Problem(at(100, false)) != null) fails++;
+
+        var power = at(12, false);
+        var battery = new BatteryReminder(() => power);
+        var alert = battery.Due();
+        if (alert == null || alert.Key != "low" || alert.Time != "12%" || !battery.StillCurrent(alert) || alert.Sound != IslandSound.Alarm || !alert.LoopSound) fails++;
+        var full = new BatteryReminder(() => at(97, true)).Due();
+        if (full.Sound != IslandSound.Alarm || !full.LoopSound) fails++;
+
+        // The alarm loops cleanly: 1.2 s, silent at both ends so the seam doesn't click, beeping in between.
+        var alarm = IslandSound.Beeps(0.5, 1200, 1319, 0, 1319, 160, 1319, 320, 1319, 480);
+        if ((alarm.Length - 44) / 2 != 52920 || BitConverter.ToInt16(alarm, 44) != 0 || BitConverter.ToInt16(alarm, alarm.Length - 2) != 0) fails++;
+        int loud = 0;
+        for (int i = 44; i < alarm.Length; i += 2) if (Math.Abs((int)BitConverter.ToInt16(alarm, i)) > 8000) loud++;
+        if (loud == 0) fails++;
+        battery.Answer(alert, false);
+        if (battery.Due() != null) fails++;            // snoozed for a minute
+        power = at(12, true);
+        if (battery.StillCurrent(alert) || battery.Due() != null) fails++; // plugged in: island closes
+        power = at(12, false);
+        if (battery.Due() == null) fails++;            // unplugged again: alerts at once, no leftover snooze
+        if (new BatteryReminder(() => null).Due() != null) fails++; // no battery
+        return fails;
     }
 
     // Media: the bar moves on between reads but never past the end, and stops while paused.

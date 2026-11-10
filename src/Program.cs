@@ -29,6 +29,6 @@ static class Program
         Prayers.LoadSettings();
         Tracker.Load();
         // Highest priority first. New reminders are added here.
-        new IslandWindow(MediaSession.Live(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live()).Show();
+        new IslandWindow(MediaSession.Live(), new BatteryReminder(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live()).Show();
     }
 }
