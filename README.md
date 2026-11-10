@@ -13,25 +13,26 @@ It is written in C# 5 with WPF, built with the .NET Framework compiler that come
 
 1. [Quick start](#quick-start)
 2. [Keyboard shortcuts](#keyboard-shortcuts)
-3. [Todo panel](#todo-panel)
-4. [The island](#the-island)
-5. [Prayer reminders and dashboard](#prayer-reminders-and-dashboard)
-6. [Water reminder](#water-reminder)
-7. [Battery alarm](#battery-alarm)
-8. [Windows notifications on the island](#windows-notifications-on-the-island)
-9. [Media player](#media-player)
-10. [Timer](#timer)
-11. [Mirror](#mirror)
-12. [File shelf](#file-shelf)
-13. [Clipboard history](#clipboard-history)
-14. [Where data is stored](#where-data-is-stored)
-15. [Privacy and permissions](#privacy-and-permissions)
-16. [Building and running](#building-and-running)
-17. [Command-line options](#command-line-options)
-18. [Tuning](#tuning)
-19. [Project layout](#project-layout)
-20. [Troubleshooting](#troubleshooting)
-21. [Known limitations](#known-limitations)
+3. [Control Center](#control-center)
+4. [Todo panel](#todo-panel)
+5. [The island](#the-island)
+6. [Prayer reminders and dashboard](#prayer-reminders-and-dashboard)
+7. [Water reminder](#water-reminder)
+8. [Battery alarm](#battery-alarm)
+9. [Windows notifications on the island](#windows-notifications-on-the-island)
+10. [Media player](#media-player)
+11. [Timer](#timer)
+12. [Mirror](#mirror)
+13. [File shelf](#file-shelf)
+14. [Clipboard history](#clipboard-history)
+15. [Where data is stored](#where-data-is-stored)
+16. [Privacy and permissions](#privacy-and-permissions)
+17. [Building and running](#building-and-running)
+18. [Command-line options](#command-line-options)
+19. [Tuning](#tuning)
+20. [Project layout](#project-layout)
+21. [Troubleshooting](#troubleshooting)
+22. [Known limitations](#known-limitations)
 
 ---
 
@@ -50,12 +51,30 @@ Only one copy can run at a time. A second copy reports that `Ctrl+Alt+T` is alre
 | Shortcut | What it does |
 |---|---|
 | `Ctrl+Alt+T` | Show or hide the todo panel |
-| `Ctrl+Alt+P` | Open the prayer dashboard |
+| `Ctrl+Alt+S` | Open the [Control Center](#control-center) on the page you last used |
+| `Ctrl+Alt+P` | Open the Control Center on the Prayer page |
 | `Ctrl+Alt+V` | Open or close clipboard history |
 | `Esc` or `Ctrl+Q` in the panel | Hide the panel (the app keeps running) |
 | `Ctrl+Shift+Q` in the panel | Quit the app completely |
 
 Clipboard history has its own keys, listed in [Clipboard history](#clipboard-history).
+
+---
+
+## Control Center
+
+One window that controls the whole app. Open it with `Ctrl+Alt+S`, the gear button on the todo panel, or the gear in the island's media player. `Ctrl+Alt+P` and the moon button open it on the Prayer page.
+
+- **Pages:** Prayer, General, Water, Battery, Notifications, Flashes, Input, Clipboard, Shelf, Sounds and About. Click one in the list on the left. The window opens on the page you used last.
+- **Changes apply at once.** There is no Save button and no restart. The one exception is "Show todo panel on start", which applies the next time MyTodo starts.
+- **Switches:** every feature can be turned off: water, prayer and battery reminders, notifications on the island, each flash, the camera and microphone dots, taking over the volume keys, wheel volume, clipboard history, screenshots to the shelf, and sounds (all, or by kind).
+- **Values:** reminder intervals and snoozes, battery thresholds, how long notifications and flashes show, the charging animation's length, prayer offsets and angles, the Asr method (Shafi'i or Hanafi), call words, volume step, clipboard size and sound volume.
+- **Linked switches:** turning notifications off the island brings Windows' own banners back. Turning the volume flash off gives the volume keys back to Windows, so its own pop-up shows.
+- **Preview** buttons show a reminder or animation on the island without changing anything real: no water timer reset, no prayer marked.
+- **About:** open the data folder, run the self-checks, quit, or reset every setting (click twice). Reset keeps your tasks, prayer log and pins.
+- **Start with Windows** (General) adds or removes the shortcut in your Startup folder.
+
+Settings are saved in `settings.txt` in the [data folder](#where-data-is-stored). A damaged file never stops the app: unknown lines are ignored, and bad values fall back to their defaults.
 
 ---
 
@@ -66,7 +85,7 @@ Clipboard history has its own keys, listed in [Clipboard history](#clipboard-his
 - **Rename:** double-click the text, edit, then press Enter or click elsewhere. Esc cancels.
 - **Delete:** hover a task and click the **×** on its right.
 - **Move the panel:** drag it by any empty area. It remembers its position.
-- **Header buttons:** the moon opens the prayer dashboard. The **×** hides the panel. Bring it back with `Ctrl+Alt+T`.
+- **Header buttons:** the moon opens the Control Center on the Prayer page, and the gear opens the [Control Center](#control-center). The **×** hides the panel. Bring it back with `Ctrl+Alt+T`.
 - The count at the top shows how many tasks are not done yet.
 
 The panel uses a dark glass tint, so it stays readable on white pages as well as dark ones.
@@ -94,18 +113,18 @@ The island sits at the very top centre of the screen and changes shape with smoo
 
 While your mouse is on the island, or the mirror is open, reminders wait. Calls and the timer alarm do not wait.
 
-**Flashes** are brief messages without buttons. Each one shows for about 2 seconds:
+**Flashes** are brief messages without buttons. Each one shows briefly:
 
 | Flash | When |
 |---|---|
-| **Charging** | You plug in the charger. The island springs into a wide pill: a battery fills to the level (green, or orange at 20% and below) with a glow and a shine, a lightning bolt pops in, and the percentage counts up. A power-up glide and rising chime play. About 3 seconds |
-| **On battery** | You unplug the charger. The reverse: the battery starts green and glowing, the glow fades, the fill cools to white (orange at 20% and below), and the bolt shrinks, drops and fades away. A falling glide and two descending notes play. About 3 seconds |
+| **Charging** | You plug in the charger. The island springs into a wide pill: a battery fills to the level (green, or orange at 20% and below) with a glow and a shine, a lightning bolt pops in, and the percentage counts up. The percentage shows three small decimals and keeps climbing at the battery's real charge rate, and the subtitle shows the charging power in watts. A power-up glide and rising chime play. About 5 seconds (Control Center: Battery) |
+| **On battery** | You unplug the charger. The reverse: the battery starts green and glowing, the glow fades, the fill cools to white (orange at 20% and below), and the bolt shrinks, drops and fades away. A falling glide and two descending notes play. About 5 seconds |
 | **Volume** | Volume or mute changes from keys, the taskbar or an app. A bar shows the level; holding a key moves the bar smoothly |
 | **Brightness** | Built-in screen brightness changes, including automatic brightness |
 | **Bluetooth** | A device connects (with its battery level when Windows knows it) or disconnects |
 | **Screenshot** | A new screenshot is saved. It goes onto the [file shelf](#file-shelf), and the flash shows its thumbnail |
 
-Flashes never interrupt a reminder, an open panel, or the player while your mouse is on it.
+Flashes last about 2.2 seconds (Control Center: Flashes), and each kind can be switched off there. Flashes never interrupt a reminder, an open panel, or the player while your mouse is on it.
 
 **Volume and brightness pills can be adjusted:** scroll on the pill (2% per notch), or click or drag its bar. The pill stays while the mouse is on it.
 
@@ -137,13 +156,14 @@ Times are calculated offline:
 - Fajr and Isha: 18°
 - Asr: Shafi'i method
 
-These were checked against aladhan.com to within one minute. The ACJU (Sri Lanka) timetable may differ slightly. To shift any prayer by a fixed number of minutes, see [Tuning](#tuning).
+These were checked against aladhan.com to within one minute. The ACJU (Sri Lanka) timetable may differ slightly. The angles, the Asr method (Shafi'i or Hanafi) and a per-prayer offset in minutes can be changed on the Control Center's Prayer page.
 
 ### Dashboard
 
-Open it with `Ctrl+Alt+P` or the moon button on the todo panel.
+The dashboard is the Prayer page of the [Control Center](#control-center). Open it with `Ctrl+Alt+P` or the moon button on the todo panel.
 
-- **Settings:** set place name, latitude, longitude and time zone.
+- **Location & time zone:** set place name, latitude, longitude and time zone.
+- **Prayer reminders** (below the history): switch reminders off, change the snooze, the Fajr and Isha angles, the Asr method and each prayer's offset. The times on the page update as you change them.
 - **Today:** shows each prayer's status. Click a cell to correct it.
 - **History and charts:** show prayed and missed counts over time, streaks and per-prayer analytics. Click a history cell to correct a past day.
 - Prayed is shown in blue and Missed in orange, each with a shape icon, so the colours remain distinguishable for colour-blind users.
@@ -292,7 +312,7 @@ Everything is in `C:\Users\<you>\AppData\Local\MyTodo\`, also reachable as `%LOC
 | `prayer-settings.txt` | Prayer location and time zone |
 | `clipboard-pins.txt` | Pinned clipboard text, one Base64 entry per line |
 | `shelf.txt` | Paths of files on the shelf |
-| `shelf-settings.txt` | Whether screenshots go onto the shelf automatically |
+| `settings.txt` | Every Control Center setting, as `key=value` lines. Replaces `shelf-settings.txt`, which is read once and then no longer used |
 
 None of these files are part of the Git repository. If an older version kept data next to `TodoPanel.exe`, it is copied here once, and existing files are never overwritten.
 
@@ -319,7 +339,7 @@ To back up or move your data, copy this folder.
 build.cmd
 ```
 
-`build.cmd` calls `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe` on every `.cs` file under `src\`. It references WPF, `System.Drawing` and the Windows Runtime metadata in `%WINDIR%\System32\WinMetadata`, used for notifications, media, camera and battery. The output is `TodoPanel.exe` in the project root.
+`build.cmd` calls `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe` on every `.cs` file under `src\`. It references WPF, `System.Drawing` and the Windows Runtime metadata in `%WINDIR%\System32\WinMetadata`, used for notifications, media, camera and battery. The output is `TodoPanel.exe` in the project root. An optional first argument writes the exe somewhere else, for example `build.cmd "%TEMP%\MyTodoCheck.exe"` to run `--check` on a copy while the app keeps running.
 
 The running app locks `TodoPanel.exe`, so quit it with `Ctrl+Shift+Q` before rebuilding. The compiler supports C# 5 only, so newer features such as `?.`, `$"..."` and `out var` will not compile.
 
@@ -354,24 +374,21 @@ The self-checks cover:
 - clipboard history
 - file thumbnails
 - shelf
+- settings (loading, clamping, damaged files) and every feature following them
 
 ---
 
 ## Tuning
 
+Most values now live in the [Control Center](#control-center) and apply at once: reminder intervals and snoozes, battery thresholds, prayer offsets and angles, the Asr method, notification time and call words, flash and charging-animation length, volume step, clipboard size and sound volume. Their defaults are in `src/Shared/Settings.cs`.
+
+What is still set in code:
+
 | What | Where |
 |---|---|
-| Shift a prayer time by minutes | `Offset` in `src/Prayer/PrayerTimes.cs` (order: Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha) |
-| Fajr / Isha angle | `FajrAngle`, `IshaAngle` in `src/Prayer/PrayerTimes.cs` |
-| Prayer snooze (10 min) | `Snooze` in `src/Prayer/PrayerReminder.cs` |
-| Water interval (90 min) and snooze (10 min) | `Every`, `Snooze` in `src/Water/WaterReminder.cs` |
-| Battery thresholds (15% / 95%) and repeat (1 min) | `Low`, `Full`, `Again` in `src/Battery/BatteryReminder.cs` |
-| Notification time on screen (6 s) and call words | `Visible`, `CallWords` in `src/Notifications/WindowsNotifications.cs` |
-| All sounds (volume, notes, rhythm) | `src/Island/IslandSound.cs` (generated in code; there are no sound files) |
+| Sounds' notes and rhythm | `src/Island/IslandSound.cs` (generated in code; there are no sound files) |
 | Island sizes (regular and small) | `Regular`, `Small` in `src/Island/IslandWindow.cs` |
 | Play-icon optical centring | `PlayNudge` in `src/Island/IslandWindow.cs` |
-| Clipboard history size (60) | `Keep` in `src/Clipboard/ClipboardHistory.cs` |
-| How long a flash shows (2.2 s) | `FlashMs` in `src/Island/IslandWindow.Flash.cs` |
 
 Rebuild after any change.
 
@@ -388,9 +405,15 @@ src/
   Shared/
     GlassWindow.cs            Base window: colours, animation helpers, acrylic, screen snapshot
     AppPaths.cs               Data folder on C:
+    Settings.cs               Every Control Center setting, kept in settings.txt
+    Startup.cs                Start with Windows (Startup folder shortcut)
   Todo/TodoPanel.cs           Todo panel and global hotkeys
-  Dashboard/DashboardWindow.cs  Shared widgets for dashboards
-  Prayer/                     Prayer times, tracker, reminder, dashboard (settings, charts)
+  Dashboard/DashboardWindow.cs  Shared widgets: cards, pills, dropdowns, switches, steppers
+  ControlCenter/
+    ControlCenter.cs          The window, page list and page switching
+    ControlCenter.Pages.cs    The settings pages
+    ControlCenter.Prayer*.cs  The Prayer page (dashboard, charts, location)
+  Prayer/                     Prayer times, tracker, reminder
   Water/WaterReminder.cs
   Battery/
     BatteryReminder.cs        Low / full battery alarm
@@ -415,6 +438,7 @@ src/
     ScreenshotWatcher.cs      New screenshots onto the shelf
   Island/
     Reminder.cs               IReminder contract and IslandNotice
+    PreviewReminder.cs        The Control Center's Preview buttons
     IslandWindow.cs           The island: shapes, reminders, player, mirror, timer
     IslandWindow.Shelf.cs     The island's file shelf
     IslandWindow.Flash.cs     Flashes and the camera / microphone dots
