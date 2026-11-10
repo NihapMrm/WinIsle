@@ -30,7 +30,34 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures();
+    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures();
+    }
+
+    // Shelf: holds each file once, survives a restart, and drops files that were moved or deleted.
+    static int ShelfFailures()
+    {
+        int fails = 0;
+        var root = Path.Combine(Path.GetTempPath(), "MyTodoShelf" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        try
+        {
+            string a = Path.Combine(root, "a.txt"), b = Path.Combine(root, "b.pdf"), list = Path.Combine(root, "shelf.txt");
+            File.WriteAllText(a, "a");
+            File.WriteAllText(b, "b");
+            var shelf = new FileShelf(list);
+            if (shelf.Add(new[] { a, b, a.ToUpperInvariant() }) != 2 || shelf.Count != 2) fails++;
+            if (shelf.Add(new[] { root }) != 1) fails++;                       // folders can be held too
+            if (new FileShelf(list).Count != 3) fails++;                      // read back after a restart
+            File.Delete(b);
+            shelf.Prune();
+            if (shelf.Count != 2 || shelf.Paths.Contains(b)) fails++;         // moved away: off the shelf
+            shelf.Remove(a);
+            if (shelf.Count != 1) fails++;
+            shelf.Clear();
+            if (new FileShelf(list).Count != 0 || !File.Exists(a)) fails++;   // clearing never touches the files
+        }
+        finally { Directory.Delete(root, true); }
+        return fails;
     }
 
     // Clipboard: copying again moves to the top, pins stay first and are never trimmed, search and ages read right.

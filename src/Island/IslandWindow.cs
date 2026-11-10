@@ -17,7 +17,7 @@ using System.Windows.Threading;
 // A fixed per-pixel transparent window: curves are fully anti-aliased, and clicks on its empty
 // pixels fall through to whatever is underneath. DWM acrylic can't be used here because it
 // fills the whole window rectangle and ignores window regions.
-class IslandWindow : GlassWindow
+partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow.Shelf.cs
 {
     [DllImport("gdi32.dll")] static extern bool DeleteObject(IntPtr obj);
     [DllImport("user32.dll")] static extern bool SetWindowPos(IntPtr hwnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
@@ -113,6 +113,8 @@ class IslandWindow : GlassWindow
 
     // Timer panel, and the countdown peek shown while a timer runs.
     readonly CountdownTimer timer; // null in demos
+    readonly FileShelf shelf;      // null in demos
+    readonly System.Windows.Shapes.Path pillIcon = new System.Windows.Shapes.Path { Width = 13, Height = 13, Stretch = Stretch.Uniform, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
     readonly TimeWheel hoursWheel = new TimeWheel(24), minutesWheel = new TimeWheel(60), secondsWheel = new TimeWheel(60);
     readonly TextBlock timerPeekText = new TextBlock { FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
     readonly System.Windows.Shapes.Path timerPlayGlyph = new System.Windows.Shapes.Path { Data = PlayIcon, RenderTransform = PlayNudge, Width = 16, Height = 16, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Color.FromRgb(18, 18, 20)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
@@ -134,10 +136,11 @@ class IslandWindow : GlassWindow
     // Raised after the island has gone following a yes answer.
     internal event Action Confirmed;
 
-    internal IslandWindow(MediaSession media, CountdownTimer timer, params IReminder[] reminders)
+    internal IslandWindow(MediaSession media, CountdownTimer timer, FileShelf shelf, params IReminder[] reminders)
     {
         this.media = media;
         this.timer = timer;
+        this.shelf = shelf;
         this.reminders = reminders;
         Title = "Reminder";
         Width = WinW; Height = WinH;
@@ -227,10 +230,11 @@ class IslandWindow : GlassWindow
         content.Children.Add(timerLayer);
         timerPeek = Layer(TimerPeekW, TimerPeekH, 0);
         var peekRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-        peekRow.Children.Add(new System.Windows.Shapes.Path { Data = CountdownTimer.Icon, Width = 13, Height = 13, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Color.FromRgb(255, 179, 64)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
+        peekRow.Children.Add(pillIcon);
         peekRow.Children.Add(timerPeekText);
         timerPeek.Children.Add(peekRow);
         content.Children.Add(timerPeek);
+        content.Children.Add(InitShelf());
         var glass = new Grid { Width = WinW, Height = WinH, Clip = clip }; // clip outside the blur so the edge stays crisp
         glass.Children.Add(backdrop);
         stage.Children.Add(glass);
@@ -239,7 +243,12 @@ class IslandWindow : GlassWindow
         Content = stage;
 
         // Hovering the peek opens the player; leaving puts it back.
-        MouseEnter += (s, e) => { if (shown == null && mediaShown && !mediaOpen) OpenPlayer(); };
+        // A shelf pill opens the shelf; otherwise the player.
+        MouseEnter += (s, e) =>
+        {
+            if (shown != null || !mediaShown || mediaOpen) return;
+            if (timerPeekShown && !timer.Active && shelf.Count > 0) OpenShelf(); else OpenPlayer();
+        };
         // The mirror and the timer panel stay open; the back arrow or a click closes them.
         MouseLeave += (s, e) => After(350, () => { if (mediaOpen && !mirrorOn && !timerOpen && !IsMouseOver) ClosePlayer(); });
 
@@ -359,9 +368,10 @@ class IslandWindow : GlassWindow
         controls.Children.Add(RoundButton(Glyph(NextIcon), 36, clear, dim, () => media.Next()));
         var controlsRow = new Grid { Height = 40 };
         controlsRow.Children.Add(controls);
-        var mirror = RoundButton(Glyph(MirrorIcon), 34, clear, dim, OpenMirror);
-        mirror.HorizontalAlignment = HorizontalAlignment.Right;
-        controlsRow.Children.Add(mirror);
+        var rightTools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+        rightTools.Children.Add(RoundButton(Glyph(ShelfIcon), 34, clear, dim, OpenShelf));
+        rightTools.Children.Add(RoundButton(Glyph(MirrorIcon), 34, clear, dim, OpenMirror));
+        controlsRow.Children.Add(rightTools);
         var tools = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Left };
         tools.Children.Add(RoundButton(Glyph(CountdownTimer.Icon), 34, clear, dim, OpenTimer));
         var clipboardGlyph = new TextBlock { Text = "", FontFamily = Icons, FontSize = 15, Foreground = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
@@ -545,8 +555,8 @@ class IslandWindow : GlassWindow
         if (!mediaShown) ShowPeek();
         Fill(media.Now ?? Idle);
         if (timerOpen) RefreshTimer();
-        if (!mediaOpen && timer.Active != timerPeekShown) RestPeek(); // a timer started, finished or was reset
-        if (timerPeekShown) timerPeekText.Text = MediaSession.Clock(timer.Remaining(DateTime.UtcNow));
+        if (!mediaOpen && WantPill() != timerPeekShown) RestPeek(); // a timer started or ended, or the shelf filled or emptied
+        if (timerPeekShown) FillPill();
     }
 
     // Slides down from above the screen until only PeekShown px show.
@@ -562,13 +572,13 @@ class IslandWindow : GlassWindow
         RestPeek();
     }
 
-    // The resting peek: a countdown pill while a timer runs, otherwise the thin line at the edge.
+    // The resting peek: a pill while a timer runs (time left) or the shelf holds files (count), otherwise the thin line.
     void RestPeek()
     {
-        bool counting = timer != null && timer.Active;
-        if (counting)
+        bool pill = WantPill();
+        if (pill)
         {
-            timerPeekText.Text = MediaSession.Clock(timer.Remaining(DateTime.UtcNow));
+            FillPill();
             HangFromLid(TimerPeekW, TimerPeekH, TimerPeekH / 2);
             if (!timerPeekShown) Reveal(timerPeek, 100);
         }
@@ -577,7 +587,26 @@ class IslandWindow : GlassWindow
             Morph(PeekW, PeekH, PeekH / 2, PeekTop);
             if (timerPeekShown) Conceal(timerPeek);
         }
-        timerPeekShown = counting;
+        timerPeekShown = pill;
+    }
+
+    bool WantPill() { return (timer != null && timer.Active) || (shelf != null && shelf.Count > 0); }
+
+    // The timer wins when both apply: it changes every second.
+    void FillPill()
+    {
+        if (timer != null && timer.Active)
+        {
+            pillIcon.Data = CountdownTimer.Icon;
+            pillIcon.Fill = new SolidColorBrush(Color.FromRgb(255, 179, 64));
+            timerPeekText.Text = MediaSession.Clock(timer.Remaining(DateTime.UtcNow));
+        }
+        else
+        {
+            pillIcon.Data = ShelfIcon;
+            pillIcon.Fill = new SolidColorBrush(ShelfAccent);
+            timerPeekText.Text = shelf.Count + (shelf.Count == 1 ? " file" : " files");
+        }
     }
 
     void OpenPlayer()
@@ -643,6 +672,7 @@ class IslandWindow : GlassWindow
     {
         mediaOpen = false;
         if (timerOpen) { timerOpen = false; Conceal(timerLayer); }
+        CloseShelf();
         Conceal(mediaLayer);
         RestPeek();
     }
@@ -734,6 +764,7 @@ class IslandWindow : GlassWindow
     {
         if (mirrorOn) { mirrorOn = false; camera.Stop(); camera = null; mirrorImage.Source = null; mirrorBitmap = null; Conceal(mirrorLayer); }
         if (timerOpen) { timerOpen = false; Conceal(timerLayer); }
+        CloseShelf();
         if (timerPeekShown) { timerPeekShown = false; Conceal(timerPeek); }
         mediaShown = mediaOpen = false;
         Conceal(mediaLayer);

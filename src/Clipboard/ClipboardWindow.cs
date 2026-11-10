@@ -316,7 +316,7 @@ class ClipboardWindow : GlassWindow
     }
 
     // A rounded preview tile; a missing file shows a plain document glyph.
-    static Border Tile(ImageSource image, double width, double height, Stretch stretch)
+    internal static Border Tile(ImageSource image, double width, double height, Stretch stretch) // also the shelf's tiles
     {
         var tile = new Border
         {

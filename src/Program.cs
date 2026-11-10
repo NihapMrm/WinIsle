@@ -19,7 +19,7 @@ static class Program
             app.Run(new TodoPanel());
             return;
         }
-        var island = new IslandWindow(null, null, demo);
+        var island = new IslandWindow(null, null, null, demo);
         island.Confirmed += app.Shutdown;
         app.Run(island);
     }
@@ -33,6 +33,6 @@ static class Program
         Tracker.Load();
         // Highest priority first. New reminders are added here.
         var timer = new CountdownTimer();
-        new IslandWindow(MediaSession.Live(), timer, timer, new BatteryReminder(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live()).Show();
+        new IslandWindow(MediaSession.Live(), timer, FileShelf.Live(), timer,new BatteryReminder(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live()).Show();
     }
 }
