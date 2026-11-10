@@ -116,8 +116,17 @@ partial class IslandWindow
             IslandSound.Play(IslandSound.Tick);
             show();
         };
+        Settings.Changed += () => show(); // also switched from the Control Center
         show();
         return row;
+    }
+
+    // The Control Center's "Clear shelf". Files themselves are never touched.
+    internal void ClearShelf()
+    {
+        if (shelf == null) return;
+        shelf.Clear();
+        RefreshShelf();
     }
 
     // ---- open / close ----

@@ -85,7 +85,7 @@ static class Program
             default: return true;
         }
     }
-    static VolumeWatcher volume; // Windows holds only a COM pointer, so the app keeps it alive
+    internal static VolumeWatcher volume; // Windows holds only a COM pointer, so the app keeps it alive; also the volume preview
 
     internal static void StartReminders()
     {

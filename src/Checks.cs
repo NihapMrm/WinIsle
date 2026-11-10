@@ -300,6 +300,7 @@ static class Checks
         if (Math.Abs(ControlCenter.StepValue(2.2, 0.2, 1, 6, 1) - 2.4) > 1e-9 || ControlCenter.StepValue(92, 5, 15, 480, 1) != 95) fails++;
         if (ControlCenter.StepValue(478, 5, 15, 480, 1) != 480 || ControlCenter.StepValue(-29, 1, -30, 30, -1) != -30) fails++;
         if (ControlCenter.Pages[0] != "Prayer" || ControlCenter.Pages.Length != 11) fails++;
+        if (!Startup.LinkPath.EndsWith(@"\Microsoft\Windows\Start Menu\Programs\Startup\Todo Panel.lnk", StringComparison.OrdinalIgnoreCase)) fails++;
         return fails;
     }
 
