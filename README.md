@@ -98,13 +98,19 @@ While your mouse is on the island, or the mirror is open, reminders wait. Calls 
 
 | Flash | When |
 |---|---|
-| **Charging** | You plug in the charger. A green bar fills to the battery level, with a chime |
+| **Charging** | You plug in the charger. The island springs into a wide pill: a battery fills to the level (green, or orange at 20% and below) with a glow and a shine, a lightning bolt pops in, and the percentage counts up. A power-up glide and rising chime play. About 3 seconds |
 | **Volume** | Volume or mute changes from keys, the taskbar or an app. A bar shows the level; holding a key moves the bar smoothly |
 | **Brightness** | Built-in screen brightness changes, including automatic brightness |
 | **Bluetooth** | A device connects (with its battery level when Windows knows it) or disconnects |
 | **Screenshot** | A new screenshot is saved. It goes onto the [file shelf](#file-shelf), and the flash shows its thumbnail |
 
-Flashes never interrupt a reminder, an open panel, or the player while your mouse is on it. Windows' own volume and brightness pop-ups still appear too; Windows offers no way to turn them off.
+Flashes never interrupt a reminder, an open panel, or the player while your mouse is on it.
+
+**Volume and brightness pills can be adjusted:** scroll on the pill (2% per notch), or click or drag its bar. The pill stays while the mouse is on it.
+
+**Volume keys** are handled by the island itself: it takes the volume up, down and mute keys before Windows does, so Windows' own volume pop-up no longer appears, and the pill shows even at 0% and 100%. If MyTodo closes, Windows handles the keys again.
+
+**Brightness keys** are handled by the laptop's firmware, which Windows apps can't intercept. So Windows' brightness pop-up still appears, and pressing past 0% or 100% shows nothing (no change happens, so nothing is reported).
 
 **Sounds:** each reminder plays a short sound. Water uses water drops. Battery and timer alarms loop an alarm-clock beep until you answer them or the condition is gone.
 
@@ -323,6 +329,7 @@ A warning about async calls not being awaited (CS4014) is expected. The media co
 | `TodoPanel.exe --check` | Runs the built-in self-checks and exits. The exit code is the number of failures, so `0` means all passed |
 | `TodoPanel.exe --demo` | Shows a prayer reminder island alone. "Not yet" comes back after 10 seconds |
 | `TodoPanel.exe --demo-water` | Same, for the water reminder |
+| `TodoPanel.exe --demo-charge` | Plays the charging animation once (at 72%) and exits |
 | `TodoPanel.exe --restore-banners` | Turns Windows notification banners back on for every app. Quit MyTodo first |
 
 The self-checks cover:
@@ -441,5 +448,6 @@ src/
 - The water timer, a running countdown timer and unpinned clipboard history reset when the app restarts.
 - The thin top-edge peek also shows over full-screen videos and games.
 - Windows notifications and media are checked once a second, which uses a little CPU continuously.
-- Windows' own volume and brightness pop-ups can't be turned off, so both appear.
+- Windows' brightness pop-up can't be turned off, and the brightness pill can't show at 0% or 100%: the keys are handled by the laptop firmware.
+- Media keys (play/pause, next) still show Windows' own pop-up.
 - Bluetooth mice and keyboards that reconnect after sleep also flash. Battery level is known only for devices Windows shows a battery for in Settings.

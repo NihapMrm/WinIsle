@@ -236,6 +236,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         timerPeek.Children.Add(peekRow);
         content.Children.Add(timerPeek);
         content.Children.Add(InitShelf());
+        content.Children.Add(chargeLayer = BuildCharge());
         content.Children.Add(BuildInUseDots()); // inside the island, at its right end
         var glass = new Grid { Width = WinW, Height = WinH, Clip = clip }; // clip outside the blur so the edge stays crisp
         glass.Children.Add(backdrop);
@@ -533,6 +534,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
 
     void Dismiss()
     {
+        EndCharging();
         open = false;
         StopRinging(); // closed by itself, e.g. the charger was plugged in
         glow.BeginAnimation(OpacityProperty, null);

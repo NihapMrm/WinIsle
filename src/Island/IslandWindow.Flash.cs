@@ -92,6 +92,7 @@ partial class IslandWindow
         if (shown != null && !flashing) return; // a reminder is on screen and matters more
         if (mirrorOn || timerOpen || shelfOpen || (mediaOpen && IsMouseOver)) return; // never pull the island from under the mouse
         flashUntil = DateTime.UtcNow.AddMilliseconds(FlashMs);
+        if (charging) return; // let the charging animation finish; it's short
         if (flashing)
         {
             bool same = shown.Key == n.Key;

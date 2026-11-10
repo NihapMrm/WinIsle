@@ -12,8 +12,8 @@ static class IslandSound
     public static readonly SoundPlayer Appear = Load(Wav(0.32, 800, 784, 0, 1175, 110));
     public static readonly SoundPlayer Yes = Load(Wav(0.36, 850, 659, 0, 784, 90, 1047, 180));
     public static readonly SoundPlayer NotYet = Load(Wav(0.24, 500, 587, 0, 440, 90));
-    // Plugging in the charger: a bright rising pair.
-    public static readonly SoundPlayer Charge = Load(Wav(0.28, 650, 1047, 0, 1568, 110));
+    // Plugging in the charger: a soft power-up glide, then a rising four-note chime.
+    public static readonly SoundPlayer Charge = Load(ChargeWav());
 
     // A short dry click for each step of the timer wheels.
     public static readonly SoundPlayer Tick = Load(Mix(0.3, 30, new double[] { 3000, 0 }, (hz, t) => Math.Min(t / 0.0005, 1) * Math.Exp(-t * 350) * Math.Sin(2 * Math.PI * hz * t)));
@@ -58,15 +58,45 @@ static class IslandSound
         });
     }
 
+    // Two layers: a gliding sine from 220 to 660 Hz that swells in and fades, and from 180 ms a G-major
+    // arpeggio of bells (G5 B5 D6 G6) whose tails overlap into a chord.
+    internal static byte[] ChargeWav()
+    {
+        var mix = new double[Rate * 1400 / 1000];
+        const double GlideLength = 0.35;
+        Add(mix, 220, 0, (hz, t) =>
+        {
+            if (t >= GlideLength) return 0;
+            double phase = 2 * Math.PI * (hz * t + (2 * hz / GlideLength) * t * t / 2); // frequency rises linearly to 3x
+            return 0.55 * Math.Min(t / 0.03, 1) * Math.Min((GlideLength - t) / 0.08, 1) * Math.Sin(phase);
+        });
+        double[] notes = { 784, 988, 1175, 1568 };
+        for (int i = 0; i < notes.Length; i++)
+            Add(mix, notes[i], 180 + i * 75, (hz, t) =>
+            {
+                double phase = 2 * Math.PI * hz * t;
+                return Math.Min(t / 0.004, 1) * Math.Exp(-t * 5.5) * (Math.Sin(phase) + 0.25 * Math.Sin(2 * phase) + 0.08 * Math.Sin(3 * phase));
+            });
+        return Encode(mix, 0.32);
+    }
+
+    static void Add(double[] mix, double hz, double startMs, Func<double, double, double> voice)
+    {
+        int start = (int)(startMs * Rate / 1000);
+        for (int i = start; i < mix.Length; i++) mix[i] += voice(hz, (i - start) / (double)Rate);
+    }
+
     // Adds up one voice per (hertz, start ms) pair and encodes 16-bit mono PCM.
     static byte[] Mix(double peak, int ms, double[] pairs, Func<double, double, double> voice)
     {
         var mix = new double[Rate * ms / 1000];
-        for (int n = 0; n < pairs.Length; n += 2)
-        {
-            int start = (int)(pairs[n + 1] * Rate / 1000);
-            for (int i = start; i < mix.Length; i++) mix[i] += voice(pairs[n], (i - start) / (double)Rate);
-        }
+        for (int n = 0; n < pairs.Length; n += 2) Add(mix, pairs[n], pairs[n + 1], voice);
+        return Encode(mix, peak);
+    }
+
+    // Scales to the peak volume (so it never clips) and writes a 16-bit mono WAV.
+    static byte[] Encode(double[] mix, double peak)
+    {
         double scale = peak * short.MaxValue / mix.Max(x => Math.Abs(x));
         double fade = Rate * 0.04; // the last 40 ms reach silence, so playback ends without a click
         using (var stream = new MemoryStream())

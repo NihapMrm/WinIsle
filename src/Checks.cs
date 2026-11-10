@@ -44,8 +44,11 @@ static class Checks
         if (!PrivacyWatcher.Active(zoom, 5, 0, onlyZoom) || PrivacyWatcher.Active(powerpoint, 5, 0, onlyZoom)) fails++;
         if (PrivacyWatcher.Active(zoom, 5, 9, onlyZoom) || PrivacyWatcher.Active(zoom, null, 0, onlyZoom)) fails++;
         if (!PrivacyWatcher.Active("Microsoft.WindowsCamera_8wekyb3d8bbwe", 5, 0, onlyZoom)) fails++; // Store apps: Windows keeps these right
-        var charge = ChargeWatcher.Notice(82);
-        if (charge.Level != 0.82 || charge.Time != "82%" || charge.Key != "charging") fails++;
+        // Charging sound: 1.4 s, full volume at its peak but never clipping, silent at the end.
+        var chime = IslandSound.ChargeWav();
+        int chimePeak = 0;
+        for (int i = 44; i < chime.Length; i += 2) chimePeak = Math.Max(chimePeak, Math.Abs((int)BitConverter.ToInt16(chime, i)));
+        if ((chime.Length - 44) / 2 != 61740 || Math.Abs(chimePeak - 0.32 * short.MaxValue) > 2 || BitConverter.ToInt16(chime, chime.Length - 2) != 0) fails++;
         var loud = VolumeWatcher.Notice(0.65f, false);
         var mute = VolumeWatcher.Notice(0.65f, true);
         if (loud.Time != "65%" || Math.Abs(loud.Level.Value - 0.65) > 0.001 || mute.Time != "Muted" || mute.Level != 0 || loud.Key != mute.Key) fails++;
