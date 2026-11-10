@@ -30,7 +30,7 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + VolumeSettingFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
     }
 
     // Flashes and watchers: the pure parts (names, levels, matching).
@@ -215,6 +215,27 @@ static class Checks
             if (Program.Allowed(brightness) || !Program.Allowed(bluetooth)) fails++;
             Settings.Set(Settings.FlashBluetooth, false);
             if (Program.Allowed(bluetooth) || !Program.Allowed(screenshot)) fails++;
+        }
+        catch (Exception) { fails++; }
+        finally { Settings.ResetAll(); }
+        return fails;
+    }
+
+    // Volume step size and whether the island takes the volume keys follow the Control Center.
+    static int VolumeSettingFailures()
+    {
+        int fails = 0;
+        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        try
+        {
+            if (!VolumeWatcher.TakeKeys()) fails++;
+            Settings.Set(Settings.VolumeKeys, false);
+            if (VolumeWatcher.TakeKeys()) fails++;
+            Settings.Set(Settings.VolumeKeys, true);
+            Settings.Set(Settings.FlashVolume, false);
+            if (VolumeWatcher.TakeKeys()) fails++; // no pill to show: Windows' own pop-up comes back
+            Settings.Set(Settings.VolumeStep, 5);
+            if (Math.Abs(VolumeWatcher.Step(0.50, true) - 0.55) > 1e-9 || Math.Abs(VolumeWatcher.Step(0.52, true) - 0.55) > 1e-9 || VolumeWatcher.Step(0.02, false) != 0) fails++;
         }
         catch (Exception) { fails++; }
         finally { Settings.ResetAll(); }

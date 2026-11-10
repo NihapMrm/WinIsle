@@ -147,7 +147,7 @@ public class VolumeWatcher : IAudioEndpointVolumeCallback
     {
         keyHook = (code, w, l) =>
         {
-            if (code >= 0 && endpoint != null)
+            if (code >= 0 && endpoint != null && TakeKeys())
             {
                 int key = Marshal.ReadInt32(l);
                 if (key == VolumeUpKey || key == VolumeDownKey || key == VolumeMuteKey)
@@ -166,6 +166,8 @@ public class VolumeWatcher : IAudioEndpointVolumeCallback
         {
             if (code < 0 || endpoint == null || (Marshal.ReadInt32(l, 12) & Injected) != 0) return CallNextHookEx(mouseHandle, code, w, l);
             int message = (int)w;
+            // Switched off in the Control Center: everything passes, except finishing a press already held back.
+            if (!Settings.On(Settings.WheelVolume) && !(middleHeld && message == MiddleUp)) return CallNextHookEx(mouseHandle, code, w, l);
             if (message == MiddleDown) { middleHeld = true; middleScrolled = false; wheelSum = 0; return (IntPtr)1; }
             if (message == MiddleUp && middleHeld)
             {
@@ -226,12 +228,17 @@ public class VolumeWatcher : IAudioEndpointVolumeCallback
         ShowCurrent();
     }
 
-    // Next 2% mark up or down, within 0..1.
+    // Next step mark up or down (2% unless changed in the Control Center), within 0..1.
     internal static double Step(double level, bool up)
     {
-        double next = Math.Round(level / 0.02) + (up ? 1 : -1);
-        return Math.Max(0, Math.Min(1, next * 0.02));
+        double step = Settings.Num(Settings.VolumeStep) / 100;
+        double next = Math.Round(level / step) + (up ? 1 : -1);
+        return Math.Max(0, Math.Min(1, next * step));
     }
+
+    // The island takes the volume keys only while its volume pill is on; otherwise Windows handles them and
+    // shows its own pop-up, so a key press never shows nothing.
+    internal static bool TakeKeys() { return Settings.On(Settings.VolumeKeys) && Settings.On(Settings.FlashVolume); }
 
     // The speaker's level and mute now, for the player's volume bar; false when there is no speaker.
     internal bool Current(out double level, out bool muted)
