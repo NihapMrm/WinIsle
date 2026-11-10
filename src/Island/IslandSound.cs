@@ -14,6 +14,8 @@ static class IslandSound
     public static readonly SoundPlayer NotYet = Load(Wav(0.24, 500, 587, 0, 440, 90));
     // Plugging in the charger: a soft power-up glide, then a rising four-note chime.
     public static readonly SoundPlayer Charge = Load(ChargeWav());
+    // Unplugging: the same voices going the other way, a little quieter: a falling glide, then two descending notes.
+    public static readonly SoundPlayer Unplug = Load(UnplugWav());
 
     // A short dry click for each step of the timer wheels.
     public static readonly SoundPlayer Tick = Load(Mix(0.3, 30, new double[] { 3000, 0 }, (hz, t) => Math.Min(t / 0.0005, 1) * Math.Exp(-t * 350) * Math.Sin(2 * Math.PI * hz * t)));
@@ -78,6 +80,27 @@ static class IslandSound
                 return Math.Min(t / 0.004, 1) * Math.Exp(-t * 5.5) * (Math.Sin(phase) + 0.25 * Math.Sin(2 * phase) + 0.08 * Math.Sin(3 * phase));
             });
         return Encode(mix, 0.32);
+    }
+
+    // A sine gliding down from 660 to 220 Hz, then G6 and D6 bells falling into place.
+    internal static byte[] UnplugWav()
+    {
+        var mix = new double[Rate * 1100 / 1000];
+        const double GlideLength = 0.32;
+        Add(mix, 660, 0, (hz, t) =>
+        {
+            if (t >= GlideLength) return 0;
+            double phase = 2 * Math.PI * (hz * t - (2 * hz / 3 / GlideLength) * t * t / 2); // frequency falls linearly to a third
+            return 0.55 * Math.Min(t / 0.02, 1) * Math.Min((GlideLength - t) / 0.08, 1) * Math.Sin(phase);
+        });
+        double[] notes = { 1568, 1175 };
+        for (int i = 0; i < notes.Length; i++)
+            Add(mix, notes[i], 160 + i * 110, (hz, t) =>
+            {
+                double phase = 2 * Math.PI * hz * t;
+                return Math.Min(t / 0.004, 1) * Math.Exp(-t * 6.5) * (Math.Sin(phase) + 0.22 * Math.Sin(2 * phase));
+            });
+        return Encode(mix, 0.26);
     }
 
     static void Add(double[] mix, double hz, double startMs, Func<double, double, double> voice)

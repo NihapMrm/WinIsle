@@ -17,6 +17,9 @@ partial class IslandWindow
     readonly Border batteryFill = new Border { Height = 16, Width = 0, CornerRadius = new CornerRadius(3.5), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(3, 0, 0, 0), ClipToBounds = true };
     readonly TranslateTransform shine = new TranslateTransform(-24, 0);
     readonly ScaleTransform boltPop = new ScaleTransform(0, 0);
+    readonly TranslateTransform boltDrop = new TranslateTransform(); // the bolt falls away when unplugged
+    readonly TextBlock chargeSubtitle = new TextBlock { FontSize = 11.5, Opacity = 0.6, Margin = new Thickness(0, 1, 0, 0) };
+    static readonly Color OnBattery = Color.FromRgb(235, 235, 240);
     readonly System.Windows.Shapes.Path boltPath = new System.Windows.Shapes.Path { Data = Bolt, Width = 13, Height = 17, Stretch = Stretch.Uniform, Fill = Brushes.White, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, RenderTransformOrigin = new Point(0.5, 0.5) };
     readonly System.Windows.Shapes.Ellipse chargeGlow = new System.Windows.Shapes.Ellipse { Width = 84, Height = 52, Opacity = 0, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     readonly TextBlock chargePercent = new TextBlock { FontSize = 26, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
@@ -45,7 +48,10 @@ partial class IslandWindow
         band.Fill = bandBrush;
         batteryFill.Child = band;
         shell.Children.Add(batteryFill);
-        boltPath.RenderTransform = boltPop;
+        var boltMotion = new TransformGroup();
+        boltMotion.Children.Add(boltPop);
+        boltMotion.Children.Add(boltDrop);
+        boltPath.RenderTransform = boltMotion;
         boltPath.Margin = new Thickness(0, 0, 4, 0);
         shell.Children.Add(boltPath);
         battery.Children.Add(shell);
@@ -53,7 +59,7 @@ partial class IslandWindow
 
         var words = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 0, 0) };
         words.Children.Add(chargeTitle);
-        words.Children.Add(new TextBlock { Text = "Power connected", FontSize = 11.5, Opacity = 0.6, Margin = new Thickness(0, 1, 0, 0) });
+        words.Children.Add(chargeSubtitle);
         Grid.SetColumn(words, 1);
         layer.Children.Add(words);
         Grid.SetColumn(chargePercent, 2);
@@ -61,18 +67,58 @@ partial class IslandWindow
         return layer;
     }
 
-    // From ChargeWatcher when the charger is plugged in.
-    internal void ShowCharging(int percent)
+    // The shared start of the plug-in and unplug animations: take the island, set the words, spring it open.
+    // False when something else is on the island; the moment then passes without an animation.
+    bool BeginPower(string title, string subtitle, System.Media.SoundPlayer sound)
     {
-        if (shown != null) return; // a reminder or another flash is showing
-        if (mirrorOn || timerOpen || shelfOpen || (mediaOpen && IsMouseOver)) return;
-        if (mediaShown) HidePlayer();
+        // Takes over at once from a battery alert (the charger is the answer to it) or any flash; other
+        // reminders keep the island and this moment passes without an animation.
+        bool takeOver = shown != null;
+        if (takeOver && !(flashing || shown.Key == "low" || shown.Key == "full")) return false;
+        if (mirrorOn || timerOpen || shelfOpen || (mediaOpen && IsMouseOver && !takeOver)) return false;
+        if (takeOver)
+        {
+            stageGen++; // what was scheduled for the old pill (opening, closing) no longer applies
+            StopRinging();
+            glow.BeginAnimation(OpacityProperty, null);
+            expanded = false;
+            Conceal(compact);
+            Conceal(header);
+            Conceal(actions);
+            if (charging) Conceal(chargeLayer);
+        }
+        else if (mediaShown) HidePlayer();
         inUseDots.Visibility = Visibility.Hidden;
         flashing = charging = true;
         shown = new IslandNotice { Key = "charging" }; // holds the island like any flash until it times out
         open = confirmed = false;
         flashUntil = DateTime.UtcNow.AddMilliseconds(ChargeMs);
+        chargeTitle.Text = title;
+        chargeSubtitle.Text = subtitle;
+        // Clear what the other animation left behind.
+        foreach (var held in new[] { ScaleTransform.ScaleXProperty, ScaleTransform.ScaleYProperty }) boltPop.BeginAnimation(held, null);
+        boltDrop.BeginAnimation(TranslateTransform.YProperty, null);
+        boltDrop.Y = 0;
+        boltPath.BeginAnimation(OpacityProperty, null);
+        boltPath.Opacity = 1;
+        shine.BeginAnimation(TranslateTransform.XProperty, null);
+        shine.X = -24;
+        batteryFill.BeginAnimation(WidthProperty, null);
 
+        SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13);
+        if (!takeOver) CaptureBackdrop(); // taking over keeps the glass already showing
+        sound.Play();
+        if (!takeOver) { Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2); Jump(y, 0); } // else morph from the alert's shape
+        Morph(ChargeW, ChargeH, ChargeR);
+        Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);
+        Reveal(chargeLayer, 120);
+        return true;
+    }
+
+    // From ChargeWatcher when the charger is plugged in.
+    internal void ShowCharging(int percent)
+    {
+        if (!BeginPower("Charging", "Power connected", IslandSound.Charge)) return;
         double level = Math.Max(0, Math.Min(100, percent)) / 100.0;
         var color = percent <= 20 ? ChargeLow : ChargeGreen;
         var fill = new LinearGradientBrush(Color.FromArgb(255, (byte)Math.Min(255, color.R + 40), (byte)Math.Min(255, color.G + 30), (byte)Math.Min(255, color.B + 30)), color, 0);
@@ -80,14 +126,6 @@ partial class IslandWindow
         chargePercent.Foreground = new SolidColorBrush(color);
         chargeGlow.Fill = new RadialGradientBrush(Color.FromArgb(140, color.R, color.G, color.B), Color.FromArgb(0, color.R, color.G, color.B));
         chargePercent.Text = "0%";
-
-        SetWindowPos(hwnd, new IntPtr(-1), 0, 0, 0, 0, 0x13);
-        CaptureBackdrop();
-        IslandSound.Charge.Play();
-        Jump(w, SeedW); Jump(h, SeedH); Jump(r, SeedH / 2); Jump(y, 0);
-        Morph(ChargeW, ChargeH, ChargeR);
-        Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);
-        Reveal(chargeLayer, 120);
 
         // Bolt pops in with an overshoot, then settles.
         boltPop.BeginAnimation(ScaleTransform.ScaleXProperty, Pop());
@@ -106,6 +144,39 @@ partial class IslandWindow
         shine.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(-24, BatteryInnerW + 6, TimeSpan.FromMilliseconds(700)) { BeginTime = TimeSpan.FromMilliseconds(1350), EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut } });
 
         WaitOut(); // dismisses after ChargeMs, like other flashes
+    }
+
+    // From ChargeWatcher when the charger is unplugged: the reverse. The battery starts green and glowing at its
+    // level, the glow fades out, the fill cools to white (orange at 20% and below), and the bolt shrinks,
+    // drops and fades away.
+    internal void ShowUnplugged(int percent)
+    {
+        if (!BeginPower("On battery", "Power disconnected", IslandSound.Unplug)) return;
+        double level = Math.Max(0, Math.Min(100, percent)) / 100.0;
+        var settle = percent <= 20 ? ChargeLow : OnBattery;
+        var cool = new CubicEase { EasingMode = EasingMode.EaseInOut };
+
+        var fill = new SolidColorBrush(ChargeGreen);
+        batteryFill.Background = fill;
+        batteryFill.Width = BatteryInnerW * level;
+        fill.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(settle, TimeSpan.FromMilliseconds(700)) { BeginTime = TimeSpan.FromMilliseconds(450), EasingFunction = cool });
+        var number = new SolidColorBrush(ChargeGreen);
+        chargePercent.Foreground = number;
+        number.BeginAnimation(SolidColorBrush.ColorProperty, new ColorAnimation(settle, TimeSpan.FromMilliseconds(700)) { BeginTime = TimeSpan.FromMilliseconds(450), EasingFunction = cool });
+        chargePercent.Text = percent + "%";
+
+        chargeGlow.Fill = new RadialGradientBrush(Color.FromArgb(140, ChargeGreen.R, ChargeGreen.G, ChargeGreen.B), Color.FromArgb(0, ChargeGreen.R, ChargeGreen.G, ChargeGreen.B));
+        chargeGlow.BeginAnimation(OpacityProperty, new DoubleAnimation(0.9, 0, TimeSpan.FromMilliseconds(1100)) { BeginTime = TimeSpan.FromMilliseconds(250), EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } });
+
+        // The bolt is there at first, then lets go.
+        var away = new CubicEase { EasingMode = EasingMode.EaseIn };
+        var start = TimeSpan.FromMilliseconds(380);
+        foreach (var axis in new[] { ScaleTransform.ScaleXProperty, ScaleTransform.ScaleYProperty })
+            boltPop.BeginAnimation(axis, new DoubleAnimation(1, 0.35, TimeSpan.FromMilliseconds(420)) { BeginTime = start, EasingFunction = away, FillBehavior = FillBehavior.HoldEnd });
+        boltDrop.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(0, 7, TimeSpan.FromMilliseconds(420)) { BeginTime = start, EasingFunction = away });
+        boltPath.BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(380)) { BeginTime = start + TimeSpan.FromMilliseconds(60), EasingFunction = away });
+
+        WaitOut();
     }
 
     static DoubleAnimationUsingKeyFrames Pop()

@@ -99,6 +99,7 @@ While your mouse is on the island, or the mirror is open, reminders wait. Calls 
 | Flash | When |
 |---|---|
 | **Charging** | You plug in the charger. The island springs into a wide pill: a battery fills to the level (green, or orange at 20% and below) with a glow and a shine, a lightning bolt pops in, and the percentage counts up. A power-up glide and rising chime play. About 3 seconds |
+| **On battery** | You unplug the charger. The reverse: the battery starts green and glowing, the glow fades, the fill cools to white (orange at 20% and below), and the bolt shrinks, drops and fades away. A falling glide and two descending notes play. About 3 seconds |
 | **Volume** | Volume or mute changes from keys, the taskbar or an app. A bar shows the level; holding a key moves the bar smoothly |
 | **Brightness** | Built-in screen brightness changes, including automatic brightness |
 | **Bluetooth** | A device connects (with its battery level when Windows knows it) or disconnects |
@@ -167,7 +168,7 @@ Open it with `Ctrl+Alt+P` or the moon button on the todo panel.
 - A looping alarm sound plays while the alert is showing.
 - **Dismiss** stops it for 1 minute, then it returns if nothing has changed.
 - **Settings** opens Windows battery settings, and the alert returns after 1 minute.
-- Plugging in or unplugging closes the alert at once.
+- Plugging in or unplugging answers the alert at once: the alarm stops and the alert pill morphs straight into the charging or unplug animation.
 - On a PC without a battery, this feature does nothing.
 - If Windows smart charging stops the battery at 80%, the 95% alert never appears.
 
@@ -335,6 +336,8 @@ A warning about async calls not being awaited (CS4014) is expected. The media co
 | `TodoPanel.exe --demo` | Shows a prayer reminder island alone. "Not yet" comes back after 10 seconds |
 | `TodoPanel.exe --demo-water` | Same, for the water reminder |
 | `TodoPanel.exe --demo-charge` | Plays the charging animation once (at 72%) and exits |
+| `TodoPanel.exe --demo-unplug` | Plays the unplug animation once (at 72%) and exits |
+| `TodoPanel.exe --demo-power` | Plays the whole battery story with a pretend battery (low alert, plug in, full alert, unplug), about 20 s, then exits |
 | `TodoPanel.exe --restore-banners` | Turns Windows notification banners back on for every app. Quit MyTodo first |
 
 The self-checks cover:

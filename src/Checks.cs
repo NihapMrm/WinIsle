@@ -49,6 +49,10 @@ static class Checks
         int chimePeak = 0;
         for (int i = 44; i < chime.Length; i += 2) chimePeak = Math.Max(chimePeak, Math.Abs((int)BitConverter.ToInt16(chime, i)));
         if ((chime.Length - 44) / 2 != 61740 || Math.Abs(chimePeak - 0.32 * short.MaxValue) > 2 || BitConverter.ToInt16(chime, chime.Length - 2) != 0) fails++;
+        var unplug = IslandSound.UnplugWav(); // 1.1 s, quieter, same rules
+        int unplugPeak = 0;
+        for (int i = 44; i < unplug.Length; i += 2) unplugPeak = Math.Max(unplugPeak, Math.Abs((int)BitConverter.ToInt16(unplug, i)));
+        if ((unplug.Length - 44) / 2 != 48510 || Math.Abs(unplugPeak - 0.26 * short.MaxValue) > 2 || BitConverter.ToInt16(unplug, unplug.Length - 2) != 0) fails++;
         var loud = VolumeWatcher.Notice(0.65f, false);
         var mute = VolumeWatcher.Notice(0.65f, true);
         if (loud.Time != "65%" || Math.Abs(loud.Level.Value - 0.65) > 0.001 || mute.Time != "Muted" || mute.Level != 0 || loud.Key != mute.Key) fails++;

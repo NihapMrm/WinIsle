@@ -10,14 +10,43 @@ static class Program
         if (args.Contains("--check")) Environment.Exit(Checks.Run());
         if (args.Contains("--restore-banners")) { WindowsNotifications.RestoreBanners(WindowsNotifications.SettingsKey); return; }
         var app = new Application { ShutdownMode = ShutdownMode.OnMainWindowClose };
-        // --demo-charge plays the charging animation once (at 72%) and exits.
-        if (args.Contains("--demo-charge"))
+        // --demo-power plays the whole battery story with a pretend battery: low alert at 15%, plug in (the
+        // charging pill takes over), full alert at 95%, unplug (the unplug pill takes over). About 20 s.
+        if (args.Contains("--demo-power"))
         {
+            var power = new BatteryReminder.Power { Percent = 15, Charging = false };
+            var demoIsland = new IslandWindow(null, null, null, new BatteryReminder(() => power));
+            var steps = new Action[]
+            {
+                () => { },                                                                          // 0 s: low alert rings
+                () => { power.Charging = true; demoIsland.ShowCharging(power.Percent); },             // 4 s: plug in
+                () => { power.Percent = 95; },                                                     // 9 s: full alert rings
+                () => { power.Charging = false; demoIsland.ShowUnplugged(power.Percent); },           // 14 s: unplug
+                () => app.Shutdown(),                                                              // 19 s
+            };
+            int[] at = { 0, 4000, 9000, 14000, 19000 };
+            demoIsland.Loaded += (s, e) =>
+            {
+                for (int i = 1; i < steps.Length; i++)
+                {
+                    var step = steps[i];
+                    var wait = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(at[i]) };
+                    wait.Tick += (s2, e2) => { wait.Stop(); step(); };
+                    wait.Start();
+                }
+            };
+            app.Run(demoIsland);
+            return;
+        }
+        // --demo-charge / --demo-unplug play the plug-in / unplug animation once (at 72%) and exit.
+        if (args.Contains("--demo-charge") || args.Contains("--demo-unplug"))
+        {
+            bool unplug = args.Contains("--demo-unplug");
             var preview = new IslandWindow(null, null, null);
             preview.Loaded += (s, e) =>
             {
                 var play = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-                play.Tick += (s2, e2) => { play.Stop(); preview.ShowCharging(72); };
+                play.Tick += (s2, e2) => { play.Stop(); if (unplug) preview.ShowUnplugged(72); else preview.ShowCharging(72); };
                 play.Start();
                 var quit = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(4500) };
                 quit.Tick += (s2, e2) => app.Shutdown();
@@ -54,7 +83,7 @@ static class Program
         var island = new IslandWindow(MediaSession.Live(), timer, FileShelf.Live(), timer, new BatteryReminder(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live());
         island.Show();
         // Brief flashes and the camera / mic dots. Each watcher fails quietly where the PC lacks the hardware.
-        ChargeWatcher.Watch(island.ShowCharging);
+        ChargeWatcher.Watch(island.ShowCharging, island.ShowUnplugged);
         volume = VolumeWatcher.Watch(island.Dispatcher, island.Flash);
         island.Volume = volume; // the player's volume bar and scrolling
         BrightnessWatcher.Watch(island.Dispatcher, island.Flash);

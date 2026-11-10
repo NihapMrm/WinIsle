@@ -132,6 +132,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
     bool expanded;       // the notice was clicked open to show all of it
     IslandSize size;     // the shown notice's layout
     System.Media.SoundPlayer ringing; // a looping sound to stop when the island closes
+    int stageGen; // bumped when a pill takes over the island, so steps scheduled for the old one are skipped
 
     // Raised after the island has gone following a yes answer.
     internal event Action Confirmed;
@@ -437,7 +438,8 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
             check.Opacity = 1;
             Go(check, System.Windows.Shapes.Shape.StrokeDashOffsetProperty, 0, 360, Out, 180, null, 9);
         }
-        After(1700, Dismiss);
+        int gen = stageGen;
+        After(1700, () => { if (gen == stageGen) Dismiss(); });
     }
 
     // ---- island choreography ----
@@ -474,8 +476,10 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         Morph(CompactW, CompactH, CompactH / 2);
         Go(stage, OpacityProperty, 1, 140, Out, 0, null, null);
         Reveal(compact, 90);
+        int gen = stageGen;
         After(620, () =>
         {
+            if (gen != stageGen) return; // something took the island over meanwhile
             open = true;
             Morph(size.Width, size.OpenH + extra, size.OpenR);
             Conceal(compact);
@@ -544,8 +548,10 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         Conceal(actions);
         Morph(SeedW, SeedH, SeedH / 2);
         Go(stage, OpacityProperty, 0, 200, Out, 80, null, null);
+        int gen = stageGen;
         After(320, () =>
         {
+            if (gen != stageGen) return; // taken over while closing: the new pill owns the island now
             StopLoop();
             backdrop.Source = null;
             shown = null;
