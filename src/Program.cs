@@ -71,6 +71,8 @@ static class Program
 
     internal static ClipboardWindow ClipboardPanel; // Ctrl+Alt+V and the island's clipboard button
     internal static ClipboardHistory Clipboard;     // the Control Center's "Clear history"
+    internal static IslandWindow Island;            // the Control Center's previews
+    internal static PreviewReminder Preview;
 
     // Volume, brightness and Bluetooth flashes can each be switched off in the Control Center; others always show.
     internal static bool Allowed(IslandNotice n)
@@ -94,7 +96,8 @@ static class Program
         Tracker.Load();
         // Highest priority first. New reminders are added here.
         var timer = new CountdownTimer();
-        var island = new IslandWindow(MediaSession.Live(), timer, FileShelf.Live(), timer, new BatteryReminder(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live());
+        Preview = new PreviewReminder(); // first: a Control Center preview goes ahead of everything
+        var island = Island = new IslandWindow(MediaSession.Live(), timer, FileShelf.Live(), Preview, timer, new BatteryReminder(), PrayerReminder.Live(), new WaterReminder(), WindowsNotifications.Live());
         island.Show();
         // Brief flashes and the camera / mic dots. Each watcher fails quietly where the PC lacks the hardware.
         ChargeWatcher.Watch(island.ShowCharging, island.ShowUnplugged);

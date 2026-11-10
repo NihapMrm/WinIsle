@@ -55,16 +55,23 @@ class BatteryReminder : IReminder
         var problem = p == null ? null : Problem(p.Value);
         if (problem == null) { snoozedUntil = DateTime.MinValue; return null; }
         if (DateTime.UtcNow < snoozedUntil) return null;
-        bool low = problem == "low";
+        return Notice(problem == "low", p.Value.Percent);
+    }
+
+    static IslandNotice Notice(bool low, int percent)
+    {
         return new IslandNotice
         {
-            Key = problem, Title = low ? "Battery low" : "Battery charged",
+            Key = low ? "low" : "full", Title = low ? "Battery low" : "Battery charged",
             Detail = low ? "Plug in the charger" : "Unplug the charger",
-            Time = p.Value.Percent + "%", YesLabel = "Settings", NoLabel = "Dismiss",
+            Time = percent + "%", YesLabel = "Settings", NoLabel = "Dismiss",
             Icon = BatteryShape, Accent = low ? LowAccent : FullAccent,
             Sound = IslandSound.Alarm, LoopSound = true, // rings until answered or the charger changes, again every minute
         };
     }
+
+    // The Control Center's previews, at the current thresholds.
+    internal static IslandNotice Sample(bool low) { return Notice(low, low ? Low : Full); }
 
     // Plugging in or unplugging closes the island by itself.
     public bool StillCurrent(IslandNotice shown) { return Problem() == shown.Key; }

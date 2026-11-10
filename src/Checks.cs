@@ -30,7 +30,7 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + VolumeSettingFailures() + SoundSettingFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + VolumeSettingFailures() + SoundSettingFailures() + PreviewFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
     }
 
     // Flashes and watchers: the pure parts (names, levels, matching).
@@ -266,6 +266,29 @@ static class Checks
         }
         catch (Exception) { fails++; }
         finally { Settings.ResetAll(); }
+        return fails;
+    }
+
+    // Previews show a reminder's island once and change nothing real.
+    static int PreviewFailures()
+    {
+        int fails = 0;
+        var preview = new PreviewReminder();
+        if (preview.Due() != null) fails++;
+        var sample = WaterReminder.Sample();
+        preview.Show(sample);
+        if (preview.Due() != sample || !preview.StillCurrent(sample)) fails++;
+        var result = preview.Answer(sample, true);
+        if (result.Left != "Preview" || result.Right != sample.Title || preview.Due() != null) fails++;
+
+        var water = new WaterReminder();
+        water.From = DateTime.UtcNow.AddMinutes(-5);
+        WaterReminder.Sample();
+        if (water.Due() != null || sample.Key != "water") fails++;
+        var prayer = PrayerReminder.Sample();
+        if (Tracker.Has(prayer.Key) || prayer.Title == null) fails++;
+        if (BatteryReminder.Sample(true).Key != "low" || BatteryReminder.Sample(false).Key != "full") fails++;
+        if (WindowsNotifications.Sample().Title == null) fails++;
         return fails;
     }
 

@@ -45,11 +45,24 @@ class PrayerReminder : IReminder
         var p = current();
         if (p == null || isDone(p.Key)) return null;
         if (p.Key == snoozedKey && Prayers.Now < snoozedUntil) return null;
+        return Notice(p);
+    }
+
+    static IslandNotice Notice(Prayer p)
+    {
         return new IslandNotice
         {
             Key = p.Key, Title = p.Name, Detail = "It's time to pray", YesLabel = "Prayed",
             Time = p.At.ToString("h:mm tt", CultureInfo.InvariantCulture), Icon = MoonShape, Accent = Gold,
         };
+    }
+
+    // The Control Center's preview: the next prayer's island, keyed so it can never match a logged prayer.
+    internal static IslandNotice Sample()
+    {
+        var n = Notice(new Prayer { Name = "Asr", At = Prayers.Now });
+        n.Key = "preview " + n.Key;
+        return n;
     }
 
     // Its time ended, or it was marked prayed from the dashboard. The next tick shows whatever is due.

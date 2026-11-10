@@ -176,6 +176,12 @@ class WindowsNotifications : IReminder
             && item.Lines.Any(l => l.Length <= 40 && Calls().IsMatch(l));
     }
 
+    // The Control Center's preview: a made-up message, built exactly as a real one is.
+    internal static IslandNotice Sample()
+    {
+        return Build(new List<Incoming> { new Incoming { App = "MyTodo", AppId = "", Lines = new[] { "Preview", "This is how notifications look on the island" } } });
+    }
+
     static IslandNotice Build(List<Incoming> group)
     {
         var last = group[group.Count - 1];

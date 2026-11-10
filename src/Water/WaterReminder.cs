@@ -31,6 +31,12 @@ class WaterReminder : IReminder
     {
         if (fixedEvery == null && !Settings.On(Settings.WaterOn)) return null;
         if (DateTime.UtcNow < From + (snoozed ? snooze : every)) return null;
+        return Sample();
+    }
+
+    // What Due shows; also the Control Center's preview.
+    internal static IslandNotice Sample()
+    {
         return new IslandNotice
         {
             Key = "water", Title = "Drink water", Detail = "Have a glass of water", YesLabel = "Drank",
