@@ -89,6 +89,14 @@ static class Checks
             if (shelf.Count != 1) fails++;
             shelf.Clear();
             if (new FileShelf(list).Count != 0 || !File.Exists(a)) fails++;   // clearing never touches the files
+
+            // Screenshot switch: off at first, remembered when switched on, and off again when switched off.
+            string settings = Path.Combine(root, "shelf-settings.txt");
+            if (new FileShelf(list, settings).AutoScreenshots) fails++;
+            new FileShelf(list, settings).AutoScreenshots = true;
+            if (!new FileShelf(list, settings).AutoScreenshots) fails++;
+            new FileShelf(list, settings).AutoScreenshots = false;
+            if (new FileShelf(list, settings).AutoScreenshots) fails++;
         }
         finally { Directory.Delete(root, true); }
         return fails;

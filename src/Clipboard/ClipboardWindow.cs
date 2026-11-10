@@ -107,7 +107,7 @@ partial class ClipboardWindow : GlassWindow
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var icon = new TextBlock { Text = "îœ¡", FontFamily = Icons, FontSize = 13, Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 9, 0) };
+        var icon = new TextBlock { Text = "\uE721", FontFamily = Icons, FontSize = 13, Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 9, 0) };
         // Shows what has been typed, with a blinking caret; the keys come from ClipboardWindow.Keys.cs.
         var input = new StackPanel { Orientation = Orientation.Horizontal };
         input.Children.Add(queryText);
@@ -125,7 +125,7 @@ partial class ClipboardWindow : GlassWindow
     static UIElement BuildHints()
     {
         var hints = new TextBlock { FontSize = 11, Opacity = 0.45, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0) };
-        string[] pairs = { "â†‘â†“", "choose", "â†µ", "paste", "Ctrl+P", "pin", "Del", "remove", "Esc", "close" };
+        string[] pairs = { "\u2191\u2193", "choose", "\u21B5", "paste", "Ctrl+P", "pin", "Del", "remove", "Esc", "close" };
         for (int i = 0; i < pairs.Length; i += 2)
         {
             if (i > 0) hints.Inlines.Add(new Run("     "));
@@ -270,17 +270,17 @@ partial class ClipboardWindow : GlassWindow
                 Foreground = item.IsLink ? new SolidColorBrush(Color.FromRgb(120, 185, 255)) : Foreground,
             });
         }
-        middle.Children.Add(new TextBlock { Text = Describe(item) + "  Â·  " + ClipboardHistory.Ago(DateTime.UtcNow - item.Copied), FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 3, 0, 0) });
+        middle.Children.Add(new TextBlock { Text = Describe(item) + "  \u00B7  " + ClipboardHistory.Ago(DateTime.UtcNow - item.Copied), FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 3, 0, 0) });
         Grid.SetColumn(middle, 1);
 
         var badge = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(10), Background = new SolidColorBrush(Color.FromArgb(24, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 0, 0) };
         badge.Child = new TextBlock { Text = Glyph(item), FontFamily = Icons, FontSize = 14, Opacity = 0.85, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        if (item.Pinned) right.Children.Add(new TextBlock { Text = "îœ˜", FontFamily = Icons, FontSize = 12, Foreground = new SolidColorBrush(PinColor), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
+        if (item.Pinned) right.Children.Add(new TextBlock { Text = "\uE718", FontFamily = Icons, FontSize = 12, Foreground = new SolidColorBrush(PinColor), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Opacity = 0 };
-        actions.Children.Add(IconButton(item.Pinned ? "îº" : "îœ˜", item.Pinned ? "Unpin (Ctrl+P)" : "Pin (Ctrl+P)", () => history.TogglePin(item)));
-        actions.Children.Add(IconButton("î", "Remove (Del)", () => history.Remove(item)));
+        actions.Children.Add(IconButton(item.Pinned ? "\uE77A" : "\uE718", item.Pinned ? "Unpin (Ctrl+P)" : "Pin (Ctrl+P)", () => history.TogglePin(item)));
+        actions.Children.Add(IconButton("\uE74D", "Remove (Del)", () => history.Remove(item)));
         right.Children.Add(actions);
         Grid.SetColumn(right, 2);
 
@@ -327,7 +327,7 @@ partial class ClipboardWindow : GlassWindow
             BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)), BorderThickness = new Thickness(1),
         };
         if (image == null)
-            tile.Child = new TextBlock { Text = "î¢¥", FontFamily = Icons, FontSize = 18, Opacity = 0.6, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            tile.Child = new TextBlock { Text = "\uE8A5", FontFamily = Icons, FontSize = 18, Opacity = 0.6, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         else if (stretch == Stretch.UniformToFill)
             tile.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill }; // fills the rounded corners
         else
@@ -348,9 +348,9 @@ partial class ClipboardWindow : GlassWindow
 
     static string Glyph(ClipItem item)
     {
-        if (item.Image != null) return "î¤›";             // photo
-        if (item.Files != null) return item.Files.Length > 1 ? "î¢·" : "î¢¥"; // folder / document
-        return item.IsLink ? "îœ›" : "î£ˆ";           // link / copy
+        if (item.Image != null) return "\uE91B";             // photo
+        if (item.Files != null) return item.Files.Length > 1 ? "\uE8B7" : "\uE8A5"; // folder / document
+        return item.IsLink ? "\uE71B" : "\uE8C8";           // link / copy
     }
 
     // Whitespace folded so a multi-line copy still previews as two readable lines.
@@ -367,7 +367,7 @@ partial class ClipboardWindow : GlassWindow
 
     static string Describe(ClipItem item)
     {
-        if (item.Image != null) return "Image  " + item.Image.PixelWidth + " Ã— " + item.Image.PixelHeight;
+        if (item.Image != null) return "Image  " + item.Image.PixelWidth + " \u00D7 " + item.Image.PixelHeight;
         if (item.Files != null) return item.Files.Length == 1 ? "File" : item.Files.Length + " files";
         if (item.IsLink) return "Link";
         int lines = item.Text.Split('\n').Length;

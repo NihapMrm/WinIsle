@@ -7,17 +7,34 @@ using System.Linq;
 class FileShelf
 {
     readonly List<string> paths = new List<string>();
-    readonly string file; // null in checks
+    readonly string file;         // null in checks
+    readonly string settingsFile; // shelf-settings.txt: "screenshots=on" when screenshots go onto the shelf
+    bool autoScreenshots;         // off until switched on in the shelf
 
-    internal FileShelf(string file)
+    internal FileShelf(string file, string settingsFile = null)
     {
         this.file = file;
+        this.settingsFile = settingsFile;
         try { if (file != null && File.Exists(file)) paths.AddRange(File.ReadAllLines(file).Where(l => l.Length > 0)); }
         catch (Exception) { } // unreadable: start empty
+        try { autoScreenshots = settingsFile != null && File.Exists(settingsFile) && File.ReadAllLines(settingsFile).Contains("screenshots=on"); }
+        catch (Exception) { }
         Prune();
     }
 
-    internal static FileShelf Live() { return new FileShelf(AppPaths.For("shelf.txt")); }
+    internal static FileShelf Live() { return new FileShelf(AppPaths.For("shelf.txt"), AppPaths.For("shelf-settings.txt")); }
+
+    // New screenshots go onto the shelf only while this is on. Remembered across restarts.
+    internal bool AutoScreenshots
+    {
+        get { return autoScreenshots; }
+        set
+        {
+            autoScreenshots = value;
+            if (settingsFile == null) return;
+            try { File.WriteAllText(settingsFile, value ? "screenshots=on" : "screenshots=off"); } catch (Exception) { }
+        }
+    }
 
     internal IList<string> Paths { get { return paths.AsReadOnly(); } }
     internal int Count { get { return paths.Count; } }

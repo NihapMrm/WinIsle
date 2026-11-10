@@ -245,7 +245,7 @@ The shelf temporarily holds files while you work.
 - **Use:** each file shows its Explorer thumbnail and name. Click to open it. Drag a tile, or use **Drag all**, out to any folder or app.
 - **Copy or move:** Windows decides when you drop, exactly as when dragging from Explorer. Files that are moved away leave the shelf.
 - **Remove:** **×** on a tile removes it from the shelf. The bin clears the shelf. Your files are never deleted.
-- **Screenshots:** every new screenshot from Snipping Tool (`Win+Shift+S` or Print Screen) goes onto the shelf automatically, ready to drag into a chat or email. This needs Snipping Tool's **Automatically save screenshots** setting, which is on by default; it saves to `Pictures\Screenshots`.
+- **Screenshots:** turn on the switch next to the camera icon in the shelf's header, and every new screenshot from Snipping Tool (`Win+Shift+S` or Print Screen) goes onto the shelf automatically, ready to drag into a chat or email. It is off until you turn it on, and remembers your choice. This needs Snipping Tool's **Automatically save screenshots** setting, which is on by default; it saves to `Pictures\Screenshots`.
 - Files deleted or moved elsewhere leave the shelf on their own within a second.
 - The shelf stores file paths, not copies, and remembers them after a restart.
 
@@ -288,6 +288,7 @@ Everything is in `C:\Users\<you>\AppData\Local\MyTodo\`, also reachable as `%LOC
 | `prayer-settings.txt` | Prayer location and time zone |
 | `clipboard-pins.txt` | Pinned clipboard text, one Base64 entry per line |
 | `shelf.txt` | Paths of files on the shelf |
+| `shelf-settings.txt` | Whether screenshots go onto the shelf automatically |
 
 None of these files are part of the Git repository. If an older version kept data next to `TodoPanel.exe`, it is copied here once, and existing files are never overwritten.
 
@@ -435,7 +436,7 @@ src/
 | Mirror says camera access is off | **Settings > Privacy & security > Camera** > turn on **Let desktop apps access your camera** |
 | Clipboard paste does nothing in one app | That app may run as administrator. The item is still on the clipboard; press `Ctrl+V` yourself |
 | A prayer time is a minute or two off your mosque's timetable | Adjust `Offset` (see [Tuning](#tuning)) |
-| Screenshots don't go onto the shelf | In Snipping Tool settings, turn on **Automatically save screenshots**, then restart MyTodo (it watches `Pictures\Screenshots`) |
+| Screenshots don't go onto the shelf | Turn on the camera switch in the shelf's header. Also check Snipping Tool settings: **Automatically save screenshots** must be on (MyTodo watches `Pictures\Screenshots`; restart MyTodo if that folder was just created) |
 | Brightness flash appears by itself | Automatic (adaptive) brightness is changing it; that counts as a change |
 | Shift a prayer that the PC was off for | Open the dashboard and click that prayer's cell to correct it |
 

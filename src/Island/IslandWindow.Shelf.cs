@@ -58,7 +58,8 @@ partial class IslandWindow
         left.Children.Add(shelfCount);
         header.Children.Add(left);
         var right = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-        var dragAll = MakeButton(Label("Drag all", Colors.White), Color.FromArgb(28, 255, 255, 255), Color.FromArgb(60, 255, 255, 255), () => { });
+        right.Children.Add(ScreenshotSwitch());
+        var dragAll =MakeButton(Label("Drag all", Colors.White), Color.FromArgb(28, 255, 255, 255), Color.FromArgb(60, 255, 255, 255), () => { });
         dragAll.Width = 78; dragAll.Height = 28; dragAll.CornerRadius = new CornerRadius(14);
         dragAll.ToolTip = "Drag every file out at once";
         ((TextBlock)dragAll.Child).FontSize = 12;
@@ -86,6 +87,37 @@ partial class IslandWindow
         // up short (the first opening cut the tiles in half), and this also follows any later change.
         layer.SizeChanged += (s, e) => { if (shelfOpen) HangFromLid(ShelfW, e.NewSize.Height + 2 * MediaPad, ShelfR); };
         return layer;
+    }
+
+    // A camera icon and a small switch: on puts every new screenshot onto the shelf. Off by default.
+    UIElement ScreenshotSwitch()
+    {
+        var off = Color.FromArgb(55, 255, 255, 255);
+        var trackFill = new SolidColorBrush(off);
+        var knobMove = new TranslateTransform();
+        var track = new Border { Width = 30, Height = 18, CornerRadius = new CornerRadius(9), Background = trackFill, VerticalAlignment = VerticalAlignment.Center };
+        track.Child = new System.Windows.Shapes.Ellipse { Width = 14, Height = 14, Fill = Brushes.White, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(2, 0, 0, 0), RenderTransform = knobMove };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Background = Brushes.Transparent, Cursor = Cursors.Hand, Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
+        var camera = new TextBlock { Text = "", FontFamily = Icons, FontSize = 14, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+        row.Children.Add(camera);
+        row.Children.Add(track);
+        Action show = () =>
+        {
+            bool on = shelf != null && shelf.AutoScreenshots;
+            Anim(trackFill, on ? ShelfAccent : off);
+            Anim(knobMove, TranslateTransform.XProperty, on ? 12 : 0, 220, Spring);
+            camera.Opacity = on ? 1 : 0.55;
+            row.ToolTip = on ? "New screenshots go onto the shelf (click to stop)" : "Put new screenshots onto the shelf automatically";
+        };
+        row.MouseLeftButtonUp += (s, e) =>
+        {
+            if (shelf == null) return;
+            shelf.AutoScreenshots = !shelf.AutoScreenshots;
+            IslandSound.Tick.Play();
+            show();
+        };
+        show();
+        return row;
     }
 
     // ---- open / close ----
@@ -194,7 +226,7 @@ partial class IslandWindow
     // A new screenshot (from ScreenshotWatcher): onto the shelf, with a flash showing its thumbnail.
     internal void AddScreenshot(string path)
     {
-        if (shelf == null || shelf.Add(new[] { path }) == 0) return;
+        if (shelf == null || !shelf.AutoScreenshots || shelf.Add(new[] { path }) == 0) return; // only when switched on in the shelf
         var thumb = shelfThumbs[path] = AppIcon.ForFile(path);
         if (shelfOpen) RefreshShelf();
         Flash(new IslandNotice { Key = "screenshot", Title = "Added to shelf", Time = "Screenshot", Logo = thumb, Icon = ShelfIcon, Accent = ShelfAccent, Sound = IslandSound.Tick });
