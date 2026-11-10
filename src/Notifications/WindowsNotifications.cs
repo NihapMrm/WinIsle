@@ -21,25 +21,43 @@ class WindowsNotifications : IReminder
     internal const string SettingsKey = @"Software\Microsoft\Windows\CurrentVersion\Notifications\Settings";
     internal const string BannerValue = "ShowBanner";
 
-    static readonly System.Text.RegularExpressions.Regex CallWords = new System.Text.RegularExpressions.Regex(
-        @"\b(incoming\b.*\bcall|voice call|video call|calling)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-    static readonly TimeSpan Visible = TimeSpan.FromSeconds(6);
+    // Call words and time on screen are Control Center settings.
+    static string callWords;
+    static System.Text.RegularExpressions.Regex callPattern;
     static readonly Color Accent = Color.FromRgb(180, 170, 255);
     static readonly Geometry Bell = Geometry.Parse("M12,2 C8.7,2 6,4.7 6,8 V12 L4,16 H20 L18,12 V8 C18,4.7 15.3,2 12,2 Z M9.5,18 A2.5,2.5 0 0 0 14.5,18 Z");
 
     readonly ConcurrentQueue<Incoming> incoming = new ConcurrentQueue<Incoming>();
     readonly List<Incoming> waiting = new List<Incoming>();
-    readonly TimeSpan visible;
+    readonly TimeSpan? visible; // fixed in checks; the live reader uses the setting
+    bool isLive;                // only the live reader can be switched off in the Control Center
     IslandNotice current;
     DateTime until;
 
     internal WindowsNotifications(TimeSpan visible) { this.visible = visible; }
 
+    WindowsNotifications() { }
+
+    TimeSpan Visible { get { return visible ?? TimeSpan.FromSeconds(Settings.Num(Settings.NotifySeconds)); } }
+
+    // Comma-separated phrases, matched as whole words in any case; no phrases means nothing counts as a call.
+    internal static System.Text.RegularExpressions.Regex CallPattern(string phrases)
+    {
+        var words = (phrases ?? "").Split(',').Select(w => w.Trim()).Where(w => w.Length > 0).Select(System.Text.RegularExpressions.Regex.Escape).ToArray();
+        return new System.Text.RegularExpressions.Regex(words.Length == 0 ? "(?!)" : @"\b(" + string.Join("|", words) + @")\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+    }
+
+    static System.Text.RegularExpressions.Regex Calls()
+    {
+        var words = Settings.Text(Settings.CallWords);
+        if (words != callWords) { callPattern = CallPattern(words); callWords = words; }
+        return callPattern;
+    }
+
     // Must be called on the UI thread: Windows asks for the permission from there.
     internal static WindowsNotifications Live()
     {
-        var live = new WindowsNotifications(Visible);
+        var live = new WindowsNotifications { isLive = true };
         try
         {
             var listener = UserNotificationListener.Current;
@@ -56,8 +74,19 @@ class WindowsNotifications : IReminder
     void Poll()
     {
         HashSet<uint> seen = null; // null on the first read, so old notifications don't replay at startup
+        bool? hid = null;          // whether banners were being hidden on the last pass
+        bool hideAll = false;      // banner hiding was just switched back on: hide every app's again
         while (true)
         {
+            // Banners are hidden only while notifications show on the island and that switch is on; switched
+            // off, Windows' own banners come back at once.
+            bool hide = Settings.On(Settings.NotifyOn) && Settings.On(Settings.HideBanners);
+            if (hid != hide)
+            {
+                if (!hide) try { RestoreBanners(SettingsKey); } catch (Exception) { }
+                else if (hid != null) hideAll = true;
+                hid = hide;
+            }
             try
             {
                 var listener = UserNotificationListener.Current; // fetched on this thread, not passed from the UI thread
@@ -70,12 +99,15 @@ class WindowsNotifications : IReminder
                         foreach (var n in now.Where(x => !seen.Contains(x.Id)).OrderBy(x => x.CreationTime))
                         {
                             var item = Parse(n);
-                            Add(item);
-                            HideBanner(SettingsKey, item.AppId); // covers apps that first appear after startup
+                            if (Settings.On(Settings.NotifyOn)) Add(item);
+                            if (hide) HideBanner(SettingsKey, item.AppId); // covers apps that first appear after startup
                         }
-                    else
+                    if ((seen == null && hide) || hideAll)
+                    {
                         using (var settings = Registry.CurrentUser.OpenSubKey(SettingsKey)) // only once reading works, so notifications can't vanish
                             foreach (var app in settings.GetSubKeyNames()) HideBanner(SettingsKey, app);
+                        hideAll = false;
+                    }
                     seen = new HashSet<uint>(now.Select(x => x.Id));
                 }
             }
@@ -123,6 +155,7 @@ class WindowsNotifications : IReminder
 
     public IslandNotice Due()
     {
+        if (isLive && !Settings.On(Settings.NotifyOn)) { current = null; waiting.Clear(); return null; }
         Incoming item;
         while (incoming.TryDequeue(out item)) waiting.Add(item);
         if (current != null && DateTime.UtcNow >= until) current = null; // ran out while a prayer or water reminder took over
@@ -140,7 +173,7 @@ class WindowsNotifications : IReminder
     internal static bool IsCall(Incoming item)
     {
         return !item.Lines.Any(l => l.IndexOf("missed", StringComparison.OrdinalIgnoreCase) >= 0)
-            && item.Lines.Any(l => l.Length <= 40 && CallWords.IsMatch(l));
+            && item.Lines.Any(l => l.Length <= 40 && Calls().IsMatch(l));
     }
 
     static IslandNotice Build(List<Incoming> group)
@@ -170,7 +203,7 @@ class WindowsNotifications : IReminder
     public bool StillCurrent(IslandNotice shown)
     {
         if (shown.Sticky) return true;
-        if (until == DateTime.MaxValue) until = DateTime.UtcNow + visible;
+        if (until == DateTime.MaxValue) until = DateTime.UtcNow + Visible;
         if (DateTime.UtcNow < until) return true;
         current = null;
         return false;

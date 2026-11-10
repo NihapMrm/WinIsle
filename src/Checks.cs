@@ -30,7 +30,7 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + SettingsFailures() + LiveReminderFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
     }
 
     // Flashes and watchers: the pure parts (names, levels, matching).
@@ -161,6 +161,36 @@ static class Checks
             if ((Prayers.For(day, 5.5)[2] - shafii[2]).TotalMinutes != 5) fails++;
             Settings.Set(Settings.FajrAngle, 15);
             if (Prayers.For(day, 5.5)[0] <= shafii[0]) fails++;   // a smaller angle means a later Fajr
+        }
+        catch (Exception) { fails++; }
+        finally { Settings.ResetAll(); }
+        return fails;
+    }
+
+    // Call words from the Control Center, and the clipboard's size and clearing.
+    static int NotifyClipSettingFailures()
+    {
+        int fails = 0;
+        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        try
+        {
+            var calls = WindowsNotifications.CallPattern("incoming call, voice call, video call, calling");
+            if (!calls.IsMatch("Incoming voice call") || !calls.IsMatch("Video call") || !calls.IsMatch("calling…") || calls.IsMatch("Recall the meeting")) fails++;
+            if (WindowsNotifications.CallPattern("").IsMatch("calling") || WindowsNotifications.CallPattern(" , ").IsMatch("calling")) fails++;
+            if (WindowsNotifications.CallPattern("a.b").IsMatch("axb") || !WindowsNotifications.CallPattern("a.b").IsMatch("a.b")) fails++;
+            Settings.Set(Settings.CallWords, "ring ring");
+            if (!WindowsNotifications.IsCall(new WindowsNotifications.Incoming { Lines = new[] { "Ring ring" } })) fails++;
+            if (WindowsNotifications.IsCall(new WindowsNotifications.Incoming { Lines = new[] { "Incoming voice call" } })) fails++;
+
+            Settings.Set(Settings.ClipKeep, 10);
+            var t0 = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+            var history = new ClipboardHistory();
+            history.Add(ClipItem.FromText("pinned", t0));
+            history.TogglePin(history.Items[0]);
+            for (int i = 0; i < 12; i++) history.Add(ClipItem.FromText("n" + i, t0.AddMinutes(i + 1)));
+            if (history.Items.Count != 11) fails++;
+            history.ClearUnpinned();
+            if (history.Items.Count != 1 || history.Items[0].Text != "pinned") fails++;
         }
         catch (Exception) { fails++; }
         finally { Settings.ResetAll(); }

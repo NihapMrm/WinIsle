@@ -70,12 +70,13 @@ static class Program
     }
 
     internal static ClipboardWindow ClipboardPanel; // Ctrl+Alt+V and the island's clipboard button
+    internal static ClipboardHistory Clipboard;     // the Control Center's "Clear history"
     static VolumeWatcher volume; // Windows holds only a COM pointer, so the app keeps it alive
 
     internal static void StartReminders()
     {
         Settings.Load(); // first: every feature below reads it
-        var clipboard = ClipboardHistory.Live();
+        var clipboard = Clipboard = ClipboardHistory.Live();
         ClipboardPanel = new ClipboardWindow(clipboard);
         Prayers.LoadSettings();
         Tracker.Load();

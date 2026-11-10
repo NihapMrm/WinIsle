@@ -47,7 +47,7 @@ class ClipboardHistory
     [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 
-    internal const int Keep = 60; // unpinned items; pinned ones are never dropped
+    internal static int Keep { get { return (int)Settings.Num(Settings.ClipKeep); } } // unpinned items (Control Center); pinned ones are never dropped
     internal const int MaxThumbs = 4; // file previews per item; the rest show as "+N"
     const int WM_CLIPBOARDUPDATE = 0x031D;
 
@@ -77,7 +77,7 @@ class ClipboardHistory
 
     IntPtr Hook(IntPtr hwnd, int msg, IntPtr w, IntPtr l, ref bool handled)
     {
-        if (msg == WM_CLIPBOARDUPDATE && DateTime.UtcNow >= ignoreUntil) Capture(4);
+        if (msg == WM_CLIPBOARDUPDATE && DateTime.UtcNow >= ignoreUntil && Settings.On(Settings.ClipOn)) Capture(4);
         return IntPtr.Zero;
     }
 
@@ -107,6 +107,13 @@ class ClipboardHistory
     void Trim()
     {
         foreach (var old in items.Where(i => !i.Pinned).OrderByDescending(i => i.Copied).Skip(Keep).ToList()) items.Remove(old);
+    }
+
+    // The Control Center's "Clear history": pinned items stay.
+    internal void ClearUnpinned()
+    {
+        items.RemoveAll(i => !i.Pinned);
+        Raise();
     }
 
     internal void Remove(ClipItem item)
