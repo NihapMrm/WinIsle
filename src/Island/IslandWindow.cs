@@ -34,13 +34,21 @@ class IslandWindow : GlassWindow
     const double PeekW = 150, PeekH = 20, PeekShown = 6, PeekTop = PeekShown - Inset - PeekH, GoneTop = -(Inset + PeekH + 4);
     const double MediaW = 380, MediaH = 160, MediaR = 30, MediaPad = 14;
     const double MirrorW = 360, MirrorH = 270, MirrorR = 28; // 4:3, the camera's shape
+    const double TimerW = 340, TimerH = 220, TimerR = 30;
+    const double TimerPeekW = 120, TimerPeekH = 30; // the peek grows to this while a timer runs, showing the time left
 
-    static readonly MediaInfo Idle = new MediaInfo { Title = "Nothing playing", Artist = "", AppId = "" };
+    // A play triangle's weight sits left of its box centre (centroid is a third in), so it is nudged right to look centred.
+    static readonly Transform PlayNudge = new TranslateTransform(1.5, 0);
+    static readonly Brush TopLitBorder =new LinearGradientBrush(Color.FromArgb(110, 255, 255, 255), Color.FromArgb(20, 255, 255, 255), 90);
+    static readonly Brush LidBorder = new SolidColorBrush(Color.FromArgb(70, 255, 255, 255));
+    static readonly MediaInfo Idle =new MediaInfo { Title = "Nothing playing", Artist = "", AppId = "" };
     static readonly Geometry PlayIcon =Geometry.Parse("M7,4.5 L19.5,12 L7,19.5 Z");
     static readonly Geometry PauseIcon = Geometry.Parse("M6.5,4.5 H10 V19.5 H6.5 Z M14,4.5 H17.5 V19.5 H14 Z");
     static readonly Geometry PreviousIcon = Geometry.Parse("M6,5 H8 V19 H6 Z M19,5 L9.5,12 L19,19 Z");
     static readonly Geometry NextIcon = Geometry.Parse("M16,5 H18 V19 H16 Z M5,5 L14.5,12 L5,19 Z");
-    static readonly Geometry MirrorIcon = Geometry.Parse("F0 M12,2 A6.5,8 0 1 1 11.99,2 Z M12,4 A4.5,6 0 1 1 11.99,4 Z M11,18 H13 V20.5 H11 Z M8,20.5 H16 V22 H8 Z");
+    static readonly Geometry StopIcon = Geometry.Parse("M7,7 H17 V17 H7 Z");
+    static readonly Geometry BackIcon = Geometry.Parse("M15,5 L8,12 L15,19 L16.5,17.5 L11,12 L16.5,6.5 Z");
+    static readonly Geometry MirrorIcon =Geometry.Parse("F0 M12,2 A6.5,8 0 1 1 11.99,2 Z M12,4 A4.5,6 0 1 1 11.99,4 Z M11,18 H13 V20.5 H11 Z M8,20.5 H16 V22 H8 Z");
 
     // The open island's dimensions. Corner radius = button radius + padding, so the curves are concentric.
     internal class IslandSize
@@ -88,7 +96,7 @@ class IslandWindow : GlassWindow
     readonly TextBlock remaining = new TextBlock { FontSize = 11, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
     readonly Grid seekTrack = new Grid { Background = Brushes.Transparent, Cursor = Cursors.Hand, Margin = new Thickness(8, 0, 8, 0) };
     readonly Border seekFill = new Border { Height = 4, Width = 0, CornerRadius = new CornerRadius(2), Background = new SolidColorBrush(Color.FromArgb(235, 255, 255, 255)), HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Center };
-    readonly System.Windows.Shapes.Path playGlyph = new System.Windows.Shapes.Path { Data = PlayIcon, Width = 16, Height = 16, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Color.FromRgb(18, 18, 20)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    readonly System.Windows.Shapes.Path playGlyph = new System.Windows.Shapes.Path { Data = PlayIcon, RenderTransform = PlayNudge, Width = 16, Height = 16, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Color.FromRgb(18, 18, 20)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
     Grid mediaLayer, timeline;
     MediaInfo mediaNow;   // last snapshot shown
     byte[] artBytes;      // whose image art shows
@@ -102,6 +110,15 @@ class IslandWindow : GlassWindow
     WriteableBitmap mirrorBitmap;
     Camera camera;
     bool mirrorOn;        // the island is a mirror and the camera is on
+
+    // Timer panel, and the countdown peek shown while a timer runs.
+    readonly CountdownTimer timer; // null in demos
+    readonly TimeWheel hoursWheel = new TimeWheel(24), minutesWheel = new TimeWheel(60), secondsWheel = new TimeWheel(60);
+    readonly TextBlock timerPeekText = new TextBlock { FontSize = 13, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
+    readonly System.Windows.Shapes.Path timerPlayGlyph = new System.Windows.Shapes.Path { Data = PlayIcon, RenderTransform = PlayNudge, Width = 16, Height = 16, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Color.FromRgb(18, 18, 20)), HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+    Grid timerLayer, timerPeek;
+    bool timerOpen;       // the timer panel is open under the mouse
+    bool timerPeekShown;  // the peek is the countdown pill rather than the thin line
 
     IntPtr hwnd;
     double dpi = 1;
@@ -117,9 +134,10 @@ class IslandWindow : GlassWindow
     // Raised after the island has gone following a yes answer.
     internal event Action Confirmed;
 
-    internal IslandWindow(MediaSession media, params IReminder[] reminders)
+    internal IslandWindow(MediaSession media, CountdownTimer timer, params IReminder[] reminders)
     {
         this.media = media;
+        this.timer = timer;
         this.reminders = reminders;
         Title = "Reminder";
         Width = WinW; Height = WinH;
@@ -141,7 +159,7 @@ class IslandWindow : GlassWindow
         pill.Margin = new Thickness(0, Inset, 0, 0);
         pill.BorderThickness = new Thickness(1);
         pill.Background = new LinearGradientBrush(Color.FromArgb(165, 38, 38, 42), Color.FromArgb(150, 12, 12, 14), 90);
-        pill.BorderBrush = new LinearGradientBrush(Color.FromArgb(110, 255, 255, 255), Color.FromArgb(20, 255, 255, 255), 90);
+        pill.BorderBrush = TopLitBorder;
 
         // Compact: icon and label on the left, detail on the right.
         var iconSlot = new Grid { Width = 20, Height = 20, Margin = new Thickness(0, 0, 8, 0) };
@@ -205,6 +223,14 @@ class IslandWindow : GlassWindow
         content.Children.Add(actions);
         content.Children.Add(mediaLayer);
         content.Children.Add(mirrorLayer);
+        timerLayer = BuildTimer();
+        content.Children.Add(timerLayer);
+        timerPeek = Layer(TimerPeekW, TimerPeekH, 0);
+        var peekRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        peekRow.Children.Add(new System.Windows.Shapes.Path { Data = CountdownTimer.Icon, Width = 13, Height = 13, Stretch = Stretch.Uniform, Fill = new SolidColorBrush(Color.FromRgb(255, 179, 64)), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
+        peekRow.Children.Add(timerPeekText);
+        timerPeek.Children.Add(peekRow);
+        content.Children.Add(timerPeek);
         var glass = new Grid { Width = WinW, Height = WinH, Clip = clip }; // clip outside the blur so the edge stays crisp
         glass.Children.Add(backdrop);
         stage.Children.Add(glass);
@@ -323,7 +349,7 @@ class IslandWindow : GlassWindow
         var controls = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Height = 40 };
         var play = RoundButton(playGlyph, 40, Color.FromArgb(235, 255, 255, 255), Colors.White, () =>
         {
-            playGlyph.Data = playGlyph.Data == PauseIcon ? PlayIcon : PauseIcon; // flips at once; the next read confirms
+            ShowPlay(playGlyph, playGlyph.Data == PauseIcon); // flips at once; the next read confirms
             media.PlayPause();
         });
         play.Margin = new Thickness(18, 0, 18, 0);
@@ -335,6 +361,9 @@ class IslandWindow : GlassWindow
         var mirror = RoundButton(Glyph(MirrorIcon), 34, clear, dim, OpenMirror);
         mirror.HorizontalAlignment = HorizontalAlignment.Right;
         controlsRow.Children.Add(mirror);
+        var stopwatch = RoundButton(Glyph(CountdownTimer.Icon), 34, clear, dim, OpenTimer);
+        stopwatch.HorizontalAlignment = HorizontalAlignment.Left;
+        controlsRow.Children.Add(stopwatch);
         column.Children.Add(controlsRow);
 
         layer.Children.Add(column);
@@ -511,6 +540,9 @@ class IslandWindow : GlassWindow
         if (media == null) return;
         if (!mediaShown) ShowPeek();
         Fill(media.Now ?? Idle);
+        if (timerOpen) RefreshTimer();
+        if (!mediaOpen && timer.Active != timerPeekShown) RestPeek(); // a timer started, finished or was reset
+        if (timerPeekShown) timerPeekText.Text = MediaSession.Clock(timer.Remaining(DateTime.UtcNow));
     }
 
     // Slides down from above the screen until only PeekShown px show.
@@ -523,12 +555,31 @@ class IslandWindow : GlassWindow
         ApplyShape();
         stage.BeginAnimation(OpacityProperty, null);
         stage.Opacity = 1;
-        Morph(PeekW, PeekH, PeekH / 2, PeekTop);
+        RestPeek();
+    }
+
+    // The resting peek: a countdown pill while a timer runs, otherwise the thin line at the edge.
+    void RestPeek()
+    {
+        bool counting = timer != null && timer.Active;
+        if (counting)
+        {
+            timerPeekText.Text = MediaSession.Clock(timer.Remaining(DateTime.UtcNow));
+            HangFromLid(TimerPeekW, TimerPeekH, TimerPeekH / 2);
+            if (!timerPeekShown) Reveal(timerPeek, 100);
+        }
+        else
+        {
+            Morph(PeekW, PeekH, PeekH / 2, PeekTop);
+            if (timerPeekShown) Conceal(timerPeek);
+        }
+        timerPeekShown = counting;
     }
 
     void OpenPlayer()
     {
         mediaOpen = true;
+        if (timerPeekShown) { Conceal(timerPeek); timerPeekShown = false; }
         CaptureBackdrop();
         if (mediaNow != null) Fill(mediaNow);
         HangFromLid(MediaW, MediaH, MediaR);
@@ -587,14 +638,99 @@ class IslandWindow : GlassWindow
     void ClosePlayer()
     {
         mediaOpen = false;
+        if (timerOpen) { timerOpen = false; Conceal(timerLayer); }
         Conceal(mediaLayer);
-        Morph(PeekW, PeekH, PeekH / 2, PeekTop);
+        RestPeek();
+    }
+
+    // ---- timer panel ----
+
+    // hh : mm : ss wheels, then back / start-pause / reset.
+    Grid BuildTimer()
+    {
+        var layer = Layer(TimerW - 2 * MediaPad, TimerH - 30, 16);
+        var column = new StackPanel();
+        var picker = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 0, 0, 10) };
+        foreach (var wheel in new[] { hoursWheel, minutesWheel, secondsWheel })
+        {
+            if (picker.Children.Count > 0)
+                picker.Children.Add(new TextBlock { Text = ":", FontSize = 24, Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 2, 4) });
+            wheel.Stepped += () =>
+            {
+                IslandSound.Tick.Play();
+                timer.Set(new TimeSpan(hoursWheel.Value, minutesWheel.Value, secondsWheel.Value));
+                RefreshTimer();
+            };
+            picker.Children.Add(wheel);
+        }
+        column.Children.Add(picker);
+
+        var clear = Color.FromArgb(0, 255, 255, 255);
+        var dim = Color.FromArgb(40, 255, 255, 255);
+        var row = new Grid { Height = 40 };
+        var middle = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+        var startPause = RoundButton(timerPlayGlyph, 40, Color.FromArgb(235, 255, 255, 255), Colors.White, () =>
+        {
+            if (timer.Running) timer.Pause(DateTime.UtcNow); else timer.Start(DateTime.UtcNow);
+            RefreshTimer();
+        });
+        middle.Children.Add(startPause);
+        var reset = RoundButton(Glyph(StopIcon), 36, clear, dim, () => { timer.Reset(); RefreshTimer(); });
+        reset.Margin = new Thickness(14, 0, 0, 0);
+        middle.Children.Add(reset);
+        row.Children.Add(middle);
+        var back = RoundButton(Glyph(BackIcon), 34, clear, dim, BackToPlayer);
+        back.HorizontalAlignment = HorizontalAlignment.Left;
+        row.Children.Add(back);
+        column.Children.Add(row);
+
+        layer.Children.Add(column);
+        return layer;
+    }
+
+    // The wheels show the set length when stopped, and roll down with the countdown while active.
+    void RefreshTimer()
+    {
+        var shown = timer.Remaining(DateTime.UtcNow);
+        bool active = timer.Active;
+        hoursWheel.Locked = minutesWheel.Locked = secondsWheel.Locked = active; // only a stopped timer can be changed
+        hoursWheel.Set(shown.Hours, active);
+        minutesWheel.Set(shown.Minutes, active);
+        secondsWheel.Set(shown.Seconds, active);
+        ShowPlay(timerPlayGlyph, !timer.Running);
+    }
+
+    static void ShowPlay(System.Windows.Shapes.Path glyph, bool play)
+    {
+        glyph.Data = play ? PlayIcon : PauseIcon;
+        glyph.RenderTransform = play ? PlayNudge : Transform.Identity;
+    }
+
+    void OpenTimer()
+    {
+        if (timerOpen || !mediaOpen || timer == null) return;
+        timerOpen = true;
+        RefreshTimer();
+        Conceal(mediaLayer);
+        HangFromLid(TimerW, TimerH, TimerR);
+        Reveal(timerLayer, 120);
+    }
+
+    void BackToPlayer()
+    {
+        if (!timerOpen) return;
+        timerOpen = false;
+        Conceal(timerLayer);
+        HangFromLid(MediaW, MediaH, MediaR);
+        Reveal(mediaLayer, 120);
     }
 
     // Makes way for a reminder; the peek slides back in once it's gone.
     void HidePlayer()
     {
         if (mirrorOn) { mirrorOn = false; camera.Stop(); camera = null; mirrorImage.Source = null; mirrorBitmap = null; Conceal(mirrorLayer); }
+        if (timerOpen) { timerOpen = false; Conceal(timerLayer); }
+        if (timerPeekShown) { timerPeekShown = false; Conceal(timerPeek); }
         mediaShown = mediaOpen = false;
         Conceal(mediaLayer);
         stage.BeginAnimation(OpacityProperty, null);
@@ -614,7 +750,7 @@ class IslandWindow : GlassWindow
             art.Background = image == null ? (Brush)new SolidColorBrush(Color.FromArgb(30, 255, 255, 255)) : new ImageBrush(image) { Stretch = Stretch.UniformToFill };
         }
         mediaApp.Source = AppIcon.For(m.AppId ?? "");
-        playGlyph.Data = m.Playing ? PauseIcon : PlayIcon;
+        ShowPlay(playGlyph, !m.Playing);
 
         bool timed = m.End > TimeSpan.Zero;
         timeline.Visibility = timed ? Visibility.Visible : Visibility.Hidden; // some players report no length
@@ -703,6 +839,9 @@ class IslandWindow : GlassWindow
     void Morph(double width, double height, double radius, double top = 0)
     {
         w.To = width; h.To = height; r.To = radius; y.To = top;
+        // The usual border is lit at the top and fades out at the bottom. Hanging from the lid, the top is off
+        // screen, so an even border keeps the bottom curve visible; otherwise the shape looks shorter than it is.
+        pill.BorderBrush = top < 0 ? LidBorder : TopLitBorder;
         if (looping) return;
         looping = true;
         lastFrame = TimeSpan.Zero;

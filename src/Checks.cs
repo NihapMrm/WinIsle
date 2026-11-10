@@ -30,7 +30,40 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures();
+    return fails + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures();
+    }
+
+    // Timer: counts down, pauses and resumes exactly, rings at zero, and only a stopped timer can be changed.
+    static int TimerFailures()
+    {
+        int fails = 0;
+        var t0 = DateTime.UtcNow.AddHours(-1);
+        var timer = new CountdownTimer();
+        timer.Set(TimeSpan.FromMinutes(10));
+        if (timer.Remaining(t0) != TimeSpan.FromMinutes(10) || timer.Active) fails++;
+        timer.Start(t0);
+        if (timer.Remaining(t0.AddMinutes(3)) != TimeSpan.FromMinutes(7)) fails++;
+        timer.Set(TimeSpan.FromMinutes(1));
+        if (timer.Length != TimeSpan.FromMinutes(10)) fails++;            // can't change while active
+        timer.Pause(t0.AddMinutes(3));
+        if (timer.Remaining(t0.AddMinutes(50)) != TimeSpan.FromMinutes(7) || timer.Running || !timer.Active) fails++;
+        timer.Start(t0.AddMinutes(50));                                    // resumes with 7 left: ended 2 minutes after t0 + 50
+        var alarm = timer.Due();                                           // now is t0 + 60, past the end
+        if (alarm == null || !alarm.Sticky || !alarm.LoopSound || alarm.Sound != IslandSound.Alarm) fails++;
+        timer.Answer(alarm, true);                                         // +1 min
+        if (timer.Due() != null || !timer.Running) fails++;
+        timer.Answer(alarm, false);                                        // stop
+        if (timer.Active || timer.Due() != null) fails++;
+        timer.Set(TimeSpan.FromHours(30));
+        if (timer.Length != CountdownTimer.Longest) fails++;
+        timer.Set(TimeSpan.Zero);
+        timer.Start(t0);
+        if (timer.Active) fails++; // 00:00:00 doesn't start
+
+        // Wheels wrap 59/00 both ways and roll the short way round.
+        if (TimeWheel.Wrap(-1, 60) != 59 || TimeWheel.Wrap(60, 60) != 0 || TimeWheel.Wrap(25, 24) != 1) fails++;
+        if (TimeWheel.Direction(5, 6, 60) != 1 || TimeWheel.Direction(0, 59, 60) != -1 || TimeWheel.Direction(59, 0, 60) != 1 || TimeWheel.Direction(7, 7, 60) != 0) fails++;
+        return fails;
     }
 
     // Battery: alerts at 15% unplugged and 95% charging, snoozes on Dismiss, and clears when the charger changes.
