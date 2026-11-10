@@ -14,10 +14,11 @@ using System.Windows.Media.Effects;
 
 // Clipboard history: Ctrl+Alt+V, or the clipboard button on the island. Hangs from the top edge like the island.
 // Type to search, arrows or the mouse to choose, Enter or a click to paste into the app you were in.
-class ClipboardWindow : GlassWindow
+// The panel never takes the focus, so the text cursor stays where it was in your app and the paste lands there;
+// its keys are read while it is open (ClipboardWindow.Keys.cs).
+partial class ClipboardWindow : GlassWindow
 {
     [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
 
     const double PanelW = 440, WinH = 620, Radius = 26, BlurMargin = 40, ListMax = 390;
     static readonly Brush LidBorder = new SolidColorBrush(Color.FromArgb(70, 255, 255, 255));
@@ -31,7 +32,10 @@ class ClipboardWindow : GlassWindow
     readonly Border panel = new Border();
     readonly Image backdrop = new Image { Stretch = Stretch.Fill, Width = PanelW + 2 * BlurMargin, Height = WinH + 2 * BlurMargin, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(-BlurMargin, -BlurMargin, 0, 0), Effect = new BlurEffect { Radius = 36, RenderingBias = RenderingBias.Performance } };
     readonly RectangleGeometry clip = new RectangleGeometry { RadiusX = Radius, RadiusY = Radius };
-    readonly TextBox search = new TextBox();
+    readonly TextBlock queryText = new TextBlock { FontSize = 14, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+    readonly TextBlock placeholder = new TextBlock { Text = "Type to search", Opacity = 0.42, FontSize = 14, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 0) };
+    readonly Border caret = new Border { Width = 1.5, Height = 17, Background = Brushes.White, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(1, 0, 0, 0) };
+    string query = "";
     readonly TextBlock count = new TextBlock { FontSize = 11.5, Opacity = 0.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 2, 0) };
     readonly TextBlock empty = new TextBlock { FontSize = 13, Opacity = 0.5, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 26, 0, 26) };
     readonly StackPanel list = new StackPanel();
@@ -40,7 +44,6 @@ class ClipboardWindow : GlassWindow
     readonly ScaleTransform grow = new ScaleTransform(1, 1);
     readonly List<Row> rows = new List<Row>();
     int selected;
-    IntPtr previous; // the window to paste into
     double dpi = 1;
     bool open;
 
@@ -55,6 +58,7 @@ class ClipboardWindow : GlassWindow
         Background = Brushes.Transparent;
         Topmost = true;
         ShowInTaskbar = false;
+        ShowActivated = false;
         FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI");
         Foreground = new SolidColorBrush(Text);
 
@@ -86,13 +90,11 @@ class ClipboardWindow : GlassWindow
         root.RenderTransformOrigin = new Point(0.5, 0);
         Content = root;
 
-        PreviewKeyDown += OnKey;
-        Deactivated += (s, e) => Dismiss(false); // clicked elsewhere: that app keeps the focus
         history.Changed += () => { if (open) Rebuild(false); };
         SourceInitialized += (s, e) =>
         {
             var hwnd = new WindowInteropHelper(this).Handle;
-            SetWindowLong(hwnd, -20, GetWindowLong(hwnd, -20) | 0x80); // tool window: not in Alt+Tab
+            SetWindowLong(hwnd, -20, GetWindowLong(hwnd, -20) | 0x80 | 0x08000000); // TOOLWINDOW (not in Alt+Tab) | NOACTIVATE (never takes the focus)
             dpi = HwndSource.FromHwnd(hwnd).CompositionTarget.TransformToDevice.M11;
         };
         new WindowInteropHelper(this).EnsureHandle(); // dpi is needed for the first snapshot
@@ -105,22 +107,12 @@ class ClipboardWindow : GlassWindow
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         row.ColumnDefinitions.Add(new ColumnDefinition());
         row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        var icon = new TextBlock { Text = "", FontFamily = Icons, FontSize = 13, Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 9, 0) };
-        var placeholder = new TextBlock { Text = "Search clipboard", Opacity = 0.42, FontSize = 14, IsHitTestVisible = false, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(2, 0, 0, 0) };
-        search.Background = Brushes.Transparent;
-        search.BorderThickness = new Thickness(0);
-        search.Foreground = Foreground;
-        search.CaretBrush = Foreground;
-        search.FontSize = 14;
-        search.TextChanged += (s, e) =>
-        {
-            placeholder.Visibility = search.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
-            selected = 0;
-            Rebuild(false);
-        };
-        var input = new Grid();
+        var icon = new TextBlock { Text = "îœ¡", FontFamily = Icons, FontSize = 13, Opacity = 0.6, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 9, 0) };
+        // Shows what has been typed, with a blinking caret; the keys come from ClipboardWindow.Keys.cs.
+        var input = new StackPanel { Orientation = Orientation.Horizontal };
+        input.Children.Add(queryText);
+        input.Children.Add(caret);
         input.Children.Add(placeholder);
-        input.Children.Add(search);
         Grid.SetColumn(input, 1);
         Grid.SetColumn(count, 2);
         row.Children.Add(icon);
@@ -133,7 +125,7 @@ class ClipboardWindow : GlassWindow
     static UIElement BuildHints()
     {
         var hints = new TextBlock { FontSize = 11, Opacity = 0.45, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 2, 0, 0) };
-        string[] pairs = { "↑↓", "choose", "↵", "paste", "Ctrl+P", "pin", "Del", "remove", "Esc", "close" };
+        string[] pairs = { "â†‘â†“", "choose", "â†µ", "paste", "Ctrl+P", "pin", "Del", "remove", "Esc", "close" };
         for (int i = 0; i < pairs.Length; i += 2)
         {
             if (i > 0) hints.Inlines.Add(new Run("     "));
@@ -147,24 +139,22 @@ class ClipboardWindow : GlassWindow
 
     internal void Toggle()
     {
-        if (open) Dismiss(true); else Open();
+        if (open) Dismiss(); else Open();
     }
 
     void Open()
     {
         open = true;
-        previous = GetForegroundWindow();
         var area = SystemParameters.WorkArea;
         Left = area.Left + (area.Width - PanelW) / 2;
         Top = area.Top;
         backdrop.Source = Snapshot(Left - BlurMargin, Top - BlurMargin, PanelW + 2 * BlurMargin, WinH + 2 * BlurMargin, dpi);
-        search.Text = "";
+        SetQuery("");
         selected = 0;
         Rebuild(true);
-        Show();
-        Activate();
-        search.Focus();
-        Keyboard.Focus(search);
+        Show(); // without taking the focus: the app underneath keeps its text cursor
+        StartListening();
+        caret.BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(1, 0, TimeSpan.FromMilliseconds(530)) { AutoReverse = true, RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever });
         // Drops out of the top edge with a little spring.
         Anim(root, OpacityProperty, 1, 160, Out, 0);
         Anim(slide, TranslateTransform.YProperty, 0, 460, Spring, -28);
@@ -172,23 +162,35 @@ class ClipboardWindow : GlassWindow
         Anim(grow, ScaleTransform.ScaleXProperty, 1, 460, Spring, 0.96);
     }
 
-    // restoreFocus: give the keyboard back to the app we came from (Esc, hotkey); not when the user clicked elsewhere.
-    void Dismiss(bool restoreFocus)
+    void Dismiss()
     {
         if (!open) return;
         open = false;
+        StopListening();
+        caret.BeginAnimation(OpacityProperty, null);
         Anim(root, OpacityProperty, 0, 130, Out);
         Anim(slide, TranslateTransform.YProperty, -14, 130, Out);
         After(140, () => { if (!open) Hide(); });
-        if (restoreFocus && previous != IntPtr.Zero) SetForegroundWindow(previous);
     }
 
+    // The app never lost the focus, so the paste goes straight into it, at its text cursor.
     void Paste(ClipItem item)
     {
         open = false;
+        StopListening();
+        caret.BeginAnimation(OpacityProperty, null);
         root.Opacity = 0;
-        Hide(); // gone at once, so the paste lands in the app, not here
-        history.Paste(item, previous);
+        Hide();
+        history.Paste(item, GetForegroundWindow());
+    }
+
+    void SetQuery(string text)
+    {
+        query = text;
+        queryText.Text = text;
+        placeholder.Visibility = text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        selected = 0;
+        if (open) Rebuild(false);
     }
 
     // ---- list ----
@@ -197,7 +199,7 @@ class ClipboardWindow : GlassWindow
     {
         var keep = selected >= 0 && selected < rows.Count ? rows[selected].Item : null;
         var all = history.Items;
-        var visible = all.Where(i => ClipboardHistory.Matches(i, search.Text)).ToList();
+        var visible = all.Where(i => ClipboardHistory.Matches(i, query)).ToList();
         list.Children.Clear();
         rows.Clear();
         for (int i = 0; i < visible.Count; i++)
@@ -214,7 +216,7 @@ class ClipboardWindow : GlassWindow
                 Go(move, TranslateTransform.YProperty, 0, 320, Spring, 60 + i * 22, null, -8);
             }
         }
-        count.Text = search.Text.Trim().Length == 0 ? all.Count + (all.Count == 1 ? " item" : " items") : visible.Count + " of " + all.Count;
+        count.Text = query.Trim().Length == 0 ? all.Count + (all.Count == 1 ? " item" : " items") : visible.Count + " of " + all.Count;
         empty.Text = all.Count == 0 ? "Copy something and it shows up here" : "No matches";
         empty.Visibility = visible.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         int index = keep == null ? -1 : visible.IndexOf(keep);
@@ -268,17 +270,17 @@ class ClipboardWindow : GlassWindow
                 Foreground = item.IsLink ? new SolidColorBrush(Color.FromRgb(120, 185, 255)) : Foreground,
             });
         }
-        middle.Children.Add(new TextBlock { Text = Describe(item) + "  ·  " + ClipboardHistory.Ago(DateTime.UtcNow - item.Copied), FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 3, 0, 0) });
+        middle.Children.Add(new TextBlock { Text = Describe(item) + "  Â·  " + ClipboardHistory.Ago(DateTime.UtcNow - item.Copied), FontSize = 11, Opacity = 0.5, Margin = new Thickness(0, 3, 0, 0) });
         Grid.SetColumn(middle, 1);
 
         var badge = new Border { Width = 32, Height = 32, CornerRadius = new CornerRadius(10), Background = new SolidColorBrush(Color.FromArgb(24, 255, 255, 255)), VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 2, 0, 0) };
         badge.Child = new TextBlock { Text = Glyph(item), FontFamily = Icons, FontSize = 14, Opacity = 0.85, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
 
         var right = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        if (item.Pinned) right.Children.Add(new TextBlock { Text = "", FontFamily = Icons, FontSize = 12, Foreground = new SolidColorBrush(PinColor), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
+        if (item.Pinned) right.Children.Add(new TextBlock { Text = "îœ˜", FontFamily = Icons, FontSize = 12, Foreground = new SolidColorBrush(PinColor), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) });
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Opacity = 0 };
-        actions.Children.Add(IconButton(item.Pinned ? "" : "", item.Pinned ? "Unpin (Ctrl+P)" : "Pin (Ctrl+P)", () => history.TogglePin(item)));
-        actions.Children.Add(IconButton("", "Remove (Del)", () => history.Remove(item)));
+        actions.Children.Add(IconButton(item.Pinned ? "îº" : "îœ˜", item.Pinned ? "Unpin (Ctrl+P)" : "Pin (Ctrl+P)", () => history.TogglePin(item)));
+        actions.Children.Add(IconButton("î", "Remove (Del)", () => history.Remove(item)));
         right.Children.Add(actions);
         Grid.SetColumn(right, 2);
 
@@ -325,7 +327,7 @@ class ClipboardWindow : GlassWindow
             BorderBrush = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)), BorderThickness = new Thickness(1),
         };
         if (image == null)
-            tile.Child = new TextBlock { Text = "", FontFamily = Icons, FontSize = 18, Opacity = 0.6, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+            tile.Child = new TextBlock { Text = "î¢¥", FontFamily = Icons, FontSize = 18, Opacity = 0.6, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         else if (stretch == Stretch.UniformToFill)
             tile.Background = new ImageBrush(image) { Stretch = Stretch.UniformToFill }; // fills the rounded corners
         else
@@ -346,9 +348,9 @@ class ClipboardWindow : GlassWindow
 
     static string Glyph(ClipItem item)
     {
-        if (item.Image != null) return "";             // photo
-        if (item.Files != null) return item.Files.Length > 1 ? "" : ""; // folder / document
-        return item.IsLink ? "" : "";           // link / copy
+        if (item.Image != null) return "î¤›";             // photo
+        if (item.Files != null) return item.Files.Length > 1 ? "î¢·" : "î¢¥"; // folder / document
+        return item.IsLink ? "îœ›" : "î£ˆ";           // link / copy
     }
 
     // Whitespace folded so a multi-line copy still previews as two readable lines.
@@ -365,29 +367,11 @@ class ClipboardWindow : GlassWindow
 
     static string Describe(ClipItem item)
     {
-        if (item.Image != null) return "Image  " + item.Image.PixelWidth + " × " + item.Image.PixelHeight;
+        if (item.Image != null) return "Image  " + item.Image.PixelWidth + " Ã— " + item.Image.PixelHeight;
         if (item.Files != null) return item.Files.Length == 1 ? "File" : item.Files.Length + " files";
         if (item.IsLink) return "Link";
         int lines = item.Text.Split('\n').Length;
         return lines > 1 ? "Text  " + lines + " lines" : "Text  " + item.Text.Length + " chars";
     }
 
-    // ---- keyboard ----
-
-    void OnKey(object sender, KeyEventArgs e)
-    {
-        bool ctrl = Keyboard.Modifiers == ModifierKeys.Control;
-        var current = selected < rows.Count ? rows[selected].Item : null;
-        if (e.Key == Key.Down) Select(selected + 1);
-        else if (e.Key == Key.Up) Select(selected - 1);
-        else if (e.Key == Key.PageDown) Select(selected + 5);
-        else if (e.Key == Key.PageUp) Select(selected - 5);
-        else if (e.Key == Key.Enter) { if (current != null) Paste(current); }
-        else if (e.Key == Key.Escape) { if (search.Text.Length > 0) search.Clear(); else Dismiss(true); }
-        else if (e.Key == Key.P && ctrl) { if (current != null) history.TogglePin(current); }
-        else if (e.Key == Key.Delete && (search.Text.Length == 0 || Keyboard.Modifiers == ModifierKeys.Shift)) { if (current != null) history.Remove(current); }
-        else if (ctrl && e.Key >= Key.D1 && e.Key <= Key.D9) { int n = e.Key - Key.D1; if (n < rows.Count) Paste(rows[n].Item); }
-        else return;
-        e.Handled = true;
-    }
 }

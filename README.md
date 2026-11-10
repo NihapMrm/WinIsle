@@ -269,6 +269,7 @@ It records what you copy: text, links (shown in blue), images (shown as thumbnai
 
 Notes:
 
+- The panel never takes the keyboard focus, so the text cursor stays where it was in your app and a paste lands exactly there. While it is open, the panel reads only its own keys (the ones above, plus typed characters for the search); everything else, including other Ctrl and Alt shortcuts, still reaches your app.
 - History is kept in memory and clears when the app restarts. Pinned **text** is saved to disk. Pinned images and files are kept only until the app closes.
 - Text is pasted as plain text, without formatting.
 - Pasting works by sending `Ctrl+V`. Apps running as administrator may ignore it, but the item is still on the clipboard, so you can paste it yourself.

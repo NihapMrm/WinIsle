@@ -114,6 +114,12 @@ static class Checks
         if (!ClipboardHistory.Matches(ClipItem.FromText("Hello World", t0), "world") || ClipboardHistory.Matches(ClipItem.FromText("Hello", t0), "xyz") || !ClipboardHistory.Matches(ClipItem.FromText("Hello", t0), " ")) fails++;
         if (!ClipboardHistory.Matches(new ClipItem { Files = new[] { @"C:\work\Report.pdf" } }, "report") || ClipboardHistory.Matches(new ClipItem { Files = new[] { @"C:\work\Report.pdf" } }, "work")) fails++;
         if (!ClipItem.FromText(" https://example.com/a ", t0).IsLink || ClipItem.FromText("see https://example.com", t0).IsLink) fails++;
+        // Panel keys: navigation and actions are taken; Delete only removes when not searching (or with Shift);
+        // other Ctrl shortcuts and plain letters are not commands.
+        if (ClipboardWindow.Command(0x28, false, false, false) != "down" || ClipboardWindow.Command(0x0D, false, false, true) != "paste" || ClipboardWindow.Command(0x1B, false, false, false) != "escape") fails++;
+        if (ClipboardWindow.Command('P', true, false, false) != "pin" || ClipboardWindow.Command('3', true, false, false) != "paste3" || ClipboardWindow.Command('C', true, false, false) != null) fails++;
+        if (ClipboardWindow.Command(0x2E, false, false, false) != "remove" || ClipboardWindow.Command(0x2E, false, false, true) != null || ClipboardWindow.Command(0x2E, false, true, true) != "remove") fails++;
+        if (ClipboardWindow.Command('A', false, false, false) != null || ClipboardWindow.Command(0x08, false, false, true) != "back") fails++;
         // File previews: a real file gives a picture, a missing one gives null (shown as a plain tile), never a crash.
         var explorer = Path.Combine(Environment.GetEnvironmentVariable("WINDIR"), "explorer.exe");
         if (AppIcon.ForFile(explorer) == null || AppIcon.ForFile(@"C:\no\such\file.png") != null) fails++;

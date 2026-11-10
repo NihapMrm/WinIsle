@@ -41,6 +41,10 @@ class ClipboardHistory
 {
     [DllImport("user32.dll")] static extern bool AddClipboardFormatListener(IntPtr hwnd);
     [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern bool IsWindow(IntPtr hwnd);
+    [DllImport("user32.dll")] static extern IntPtr GetOpenClipboardWindow();
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
     [DllImport("user32.dll")] static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extra);
 
     internal const int Keep = 60; // unpinned items; pinned ones are never dropped
@@ -140,21 +144,29 @@ class ClipboardHistory
         return (int)t.TotalDays + "d";
     }
 
+    // Raised with the name of the app that has the clipboard locked when a paste can't put the item on it.
+    internal event Action<string> Busy;
+
     // Puts the item back on the clipboard and pastes it into the window that was in front.
+    // Another app can keep the clipboard locked (nectarlink-desktop did, for seconds on end): then nothing is
+    // pasted and Busy names the app, instead of the UI freezing through long retries.
     internal void Paste(ClipItem item, IntPtr target)
     {
         ignoreUntil = DateTime.UtcNow.AddMilliseconds(500);
-        for (int attempt = 0; ; attempt++)
+        for (int wait = 0; wait < 10 && GetOpenClipboardWindow() != IntPtr.Zero; wait++) Thread.Sleep(30); // a brief lock passes
+        try { Put(item); }
+        catch (Exception)
         {
-            try { Put(item); break; }
-            catch (Exception) { if (attempt == 5) return; Thread.Sleep(40); } // another app is holding the clipboard
+            if (Busy != null) Busy(ClipboardHolder());
+            return;
         }
         item.Copied = DateTime.UtcNow;
         Raise();
-        if (target == IntPtr.Zero) return;
+        if (target == IntPtr.Zero || !IsWindow(target)) return; // that app has closed: the item is still on the clipboard
         SetForegroundWindow(target);
-        Later(90, () =>
+        Later(150, () => // time for the app to take the focus before the keys arrive
         {
+            if (GetForegroundWindow() != target) SetForegroundWindow(target); // one more try if it didn't take
             const byte Control = 0x11, V = 0x56;
             const uint Up = 2;
             keybd_event(Control, 0, 0, UIntPtr.Zero);
@@ -162,6 +174,19 @@ class ClipboardHistory
             keybd_event(V, 0, Up, UIntPtr.Zero);
             keybd_event(Control, 0, Up, UIntPtr.Zero);
         });
+    }
+
+    // The program holding the clipboard open right now, or "another app" when Windows can't tell.
+    static string ClipboardHolder()
+    {
+        try
+        {
+            var window = GetOpenClipboardWindow();
+            uint pid;
+            if (window == IntPtr.Zero || GetWindowThreadProcessId(window, out pid) == 0) return "another app";
+            using (var process = System.Diagnostics.Process.GetProcessById((int)pid)) return process.ProcessName;
+        }
+        catch (Exception) { return "another app"; }
     }
 
     static void Put(ClipItem item)

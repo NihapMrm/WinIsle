@@ -45,7 +45,8 @@ static class Program
 
     internal static void StartReminders()
     {
-        ClipboardPanel = new ClipboardWindow(ClipboardHistory.Live());
+        var clipboard = ClipboardHistory.Live();
+        ClipboardPanel = new ClipboardWindow(clipboard);
         Prayers.LoadSettings();
         Tracker.Load();
         // Highest priority first. New reminders are added here.
@@ -59,5 +60,11 @@ static class Program
         BluetoothWatcher.Watch(island.Dispatcher, island.Flash);
         ScreenshotWatcher.Watch(island.Dispatcher, island.AddScreenshot);
         PrivacyWatcher.Watch(island);
+        // A paste that can't reach the clipboard says which app is holding it, instead of failing silently.
+        clipboard.Busy += holder => island.Flash(new IslandNotice
+        {
+            Key = "clipboard-busy", Title = "Clipboard busy", Time = holder, Accent = System.Windows.Media.Color.FromRgb(255, 159, 10),
+            Icon = System.Windows.Media.Geometry.Parse("M12,2 L22,20 H2 Z M11,9 V14 H13 V9 Z M11,16 V18 H13 V16 Z"), Sound = IslandSound.NotYet,
+        });
     }
 }
