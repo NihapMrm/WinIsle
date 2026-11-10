@@ -106,13 +106,14 @@ class TodoPanel : GlassWindow
         root.Children.Add(header);
         root.Children.Add(inputBox);
         root.Children.Add(scroll);
-        // Glass layer over the blurred desktop: light top-down sheen + hairline highlight border.
+        // Glass layer over the blurred desktop: the island's dark tint, so white text stays readable
+        // even over a white page, plus a hairline highlight border.
         var glass = new Border
         {
             Child = root,
             CornerRadius = new CornerRadius(8),
             BorderThickness = new Thickness(1),
-            Background = new LinearGradientBrush(Color.FromArgb(46, 255, 255, 255), Color.FromArgb(12, 255, 255, 255), 90),
+            Background = new LinearGradientBrush(Color.FromArgb(150, 34, 34, 38), Color.FromArgb(135, 14, 14, 16), 90),
             BorderBrush = new LinearGradientBrush(Color.FromArgb(110, 255, 255, 255), Color.FromArgb(20, 255, 255, 255), 90),
         };
         glass.RenderTransformOrigin = new Point(0.5, 0);

@@ -240,7 +240,8 @@ class IslandWindow : GlassWindow
 
         // Hovering the peek opens the player; leaving puts it back.
         MouseEnter += (s, e) => { if (shown == null && mediaShown && !mediaOpen) OpenPlayer(); };
-        MouseLeave += (s, e) => After(350, () => { if (mediaOpen && !mirrorOn && !IsMouseOver) ClosePlayer(); }); // the mirror stays until clicked
+        // The mirror and the timer panel stay open; the back arrow or a click closes them.
+        MouseLeave += (s, e) => After(350, () => { if (mediaOpen && !mirrorOn && !timerOpen && !IsMouseOver) ClosePlayer(); });
 
         SourceInitialized += (s, e) =>
         {
@@ -388,8 +389,9 @@ class IslandWindow : GlassWindow
             if ((due != null && dueIndex < shownIndex && !shown.Sticky) || !reminders[shownIndex].StillCurrent(shown)) Dismiss();
             return;
         }
-        // Reminders wait while the player or mirror is open; calls don't.
-        if (due != null && (!(mediaOpen || mirrorOn) || due.Sticky))
+        // Reminders wait while the mirror is open or the mouse is on the island (so an open timer panel
+        // left alone doesn't hold them back forever); calls don't wait.
+        if (due != null && (!(mirrorOn || (mediaOpen && IsMouseOver)) || due.Sticky))
         {
             if (mediaShown) HidePlayer();
             Present(due, dueIndex);
