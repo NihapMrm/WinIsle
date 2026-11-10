@@ -2,29 +2,35 @@ using System;
 using System.Globalization;
 using System.Windows.Media;
 
-// Asks every 90 minutes whether you have had a drink.
+// Asks every 90 minutes (Control Center) whether you have had a drink.
 class WaterReminder : IReminder
 {
-    public static readonly TimeSpan Every = TimeSpan.FromMinutes(90), Snooze = TimeSpan.FromMinutes(10);
+    public static TimeSpan Every { get { return TimeSpan.FromMinutes(Settings.Num(Settings.WaterEvery)); } }
+    public static TimeSpan Snooze { get { return TimeSpan.FromMinutes(Settings.Num(Settings.WaterSnooze)); } }
 
     static readonly Color Accent = Color.FromRgb(120, 200, 255);
     static readonly Geometry DropShape = Geometry.Parse("M12,2 C12,2 5,10 5,15 A7,7 0 0 0 19,15 C19,10 12,2 12,2 Z");
 
-    readonly TimeSpan every, snooze;
-    DateTime due; // UTC, so changing the prayer time zone can't shift it
+    readonly TimeSpan? fixedEvery, fixedSnooze; // --demo-water only; the live reminder reads the settings each time
+    internal DateTime From; // UTC: the last answer (or start), so a changed interval applies to the wait in progress
+    bool snoozed;           // the last answer was "Not yet"
 
-    public WaterReminder() : this(Every, Snooze, Every) { }
+    public WaterReminder() { From = DateTime.UtcNow; }
 
     public WaterReminder(TimeSpan every, TimeSpan snooze, TimeSpan firstIn)
     {
-        this.every = every;
-        this.snooze = snooze;
-        due = DateTime.UtcNow + firstIn;
+        fixedEvery = every;
+        fixedSnooze = snooze;
+        From = DateTime.UtcNow + firstIn - every;
     }
+
+    TimeSpan every { get { return fixedEvery ?? Every; } }
+    TimeSpan snooze { get { return fixedSnooze ?? Snooze; } }
 
     public IslandNotice Due()
     {
-        if (DateTime.UtcNow < due) return null;
+        if (fixedEvery == null && !Settings.On(Settings.WaterOn)) return null;
+        if (DateTime.UtcNow < From + (snoozed ? snooze : every)) return null;
         return new IslandNotice
         {
             Key = "water", Title = "Drink water", Detail = "Have a glass of water", YesLabel = "Drank",
@@ -36,7 +42,8 @@ class WaterReminder : IReminder
 
     public IslandResult Answer(IslandNotice shown, bool yes)
     {
-        due = DateTime.UtcNow + (yes ? every : snooze);
+        From = DateTime.UtcNow;
+        snoozed = !yes;
         return yes ? new IslandResult { Left = "Drank", Right = "Next in " + IslandResult.Span(every) } : IslandResult.NotYet(snooze);
     }
 }

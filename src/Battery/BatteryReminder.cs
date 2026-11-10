@@ -3,11 +3,13 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows.Media;
 
-// Asks to plug in at 15% and to unplug at 95%, again every minute, until the charger is changed.
+// Asks to plug in at 15% and to unplug at 95%, again every minute, until the charger is changed. All three
+// are Control Center settings.
 class BatteryReminder : IReminder
 {
-    public const int Low = 15, Full = 95;
-    public static readonly TimeSpan Again = TimeSpan.FromMinutes(1);
+    public static int Low { get { return (int)Settings.Num(Settings.BatteryLow); } }
+    public static int Full { get { return (int)Settings.Num(Settings.BatteryFull); } }
+    public static TimeSpan Again { get { return TimeSpan.FromMinutes(Settings.Num(Settings.BatteryAgain)); } }
 
     internal struct Power { public int Percent; public bool Charging; }
 
@@ -48,6 +50,7 @@ class BatteryReminder : IReminder
 
     public IslandNotice Due()
     {
+        if (!Settings.On(Settings.BatteryOn)) return null;
         var p = read();
         var problem = p == null ? null : Problem(p.Value);
         if (problem == null) { snoozedUntil = DateTime.MinValue; return null; }

@@ -6,19 +6,20 @@ using System.Windows.Media;
 // Shows the current prayer until it is answered or its time ends.
 class PrayerReminder : IReminder
 {
-    static readonly TimeSpan Snooze = TimeSpan.FromMinutes(10);
     static readonly Color Gold = Color.FromRgb(255, 214, 140);
     static readonly Geometry MoonShape = BuildMoon();
 
     readonly Func<Prayer> current;
     readonly Func<string, bool> isDone;
     readonly Action<string> markDone;
-    readonly TimeSpan snooze;
+    readonly Func<TimeSpan> snooze; // live: the Control Center's snooze, read at each "Not yet"
+    readonly bool live;             // the live reminder can be switched off in the Control Center
     string snoozedKey;
     DateTime snoozedUntil;
 
-    PrayerReminder(Func<Prayer> current, Func<string, bool> isDone, Action<string> markDone, TimeSpan snooze)
+    PrayerReminder(Func<Prayer> current, Func<string, bool> isDone, Action<string> markDone, Func<TimeSpan> snooze, bool live)
     {
+        this.live = live;
         this.current = current;
         this.isDone = isDone;
         this.markDone = markDone;
@@ -27,7 +28,7 @@ class PrayerReminder : IReminder
 
     public static PrayerReminder Live()
     {
-        return new PrayerReminder(() => Prayers.Current(Prayers.Now, Prayers.TzAt(Prayers.Now)), Tracker.Has, key => Tracker.Mark(key, Prayers.Now), Snooze);
+        return new PrayerReminder(() => Prayers.Current(Prayers.Now, Prayers.TzAt(Prayers.Now)), Tracker.Has, key => Tracker.Mark(key, Prayers.Now), () => TimeSpan.FromMinutes(Settings.Num(Settings.PrayerSnooze)), true);
     }
 
     // A fixed prayer that never touches the log, for --demo.
@@ -35,11 +36,12 @@ class PrayerReminder : IReminder
     {
         var asr = new Prayer { Name = "Asr", At = DateTime.Now };
         string done = null;
-        return new PrayerReminder(() => asr, key => key == done, key => done = key, TimeSpan.FromSeconds(10));
+        return new PrayerReminder(() => asr, key => key == done, key => done = key, () => TimeSpan.FromSeconds(10), false);
     }
 
     public IslandNotice Due()
     {
+        if (live && !Settings.On(Settings.PrayerOn)) return null; // tracking and Missed rules carry on regardless
         var p = current();
         if (p == null || isDone(p.Key)) return null;
         if (p.Key == snoozedKey && Prayers.Now < snoozedUntil) return null;
@@ -62,8 +64,8 @@ class PrayerReminder : IReminder
         if (!yes)
         {
             snoozedKey = shown.Key;
-            snoozedUntil = Prayers.Now + snooze;
-            return IslandResult.NotYet(snooze);
+            snoozedUntil = Prayers.Now + snooze();
+            return IslandResult.NotYet(snooze());
         }
         markDone(shown.Key);
         return new IslandResult { Left = "Prayed", Right = shown.Title };

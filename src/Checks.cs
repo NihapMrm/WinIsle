@@ -30,7 +30,7 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + SettingsFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    return fails + SettingsFailures() + LiveReminderFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
     }
 
     // Flashes and watchers: the pure parts (names, levels, matching).
@@ -122,6 +122,48 @@ static class Checks
             Settings.Load(Path.Combine(root, "none", "settings.txt")); // later checks see defaults
             Directory.Delete(root, true);
         }
+        return fails;
+    }
+
+    // Reminders and prayer times follow the Control Center's settings the moment they change.
+    static int LiveReminderFailures()
+    {
+        int fails = 0;
+        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        try
+        {
+            Settings.Set(Settings.BatteryLow, 30);
+            if (BatteryReminder.Problem(new BatteryReminder.Power { Percent = 25, Charging = false }) != "low") fails++;
+            Settings.Set(Settings.BatteryFull, 80);
+            if (BatteryReminder.Problem(new BatteryReminder.Power { Percent = 85, Charging = true }) != "full") fails++;
+            Settings.Set(Settings.BatteryOn, false);
+            if (new BatteryReminder(() => new BatteryReminder.Power { Percent = 5 }).Due() != null) fails++;
+            Settings.Set(Settings.BatteryOn, true);
+            if (new BatteryReminder(() => new BatteryReminder.Power { Percent = 5 }).Due() == null) fails++;
+
+            var water = new WaterReminder();
+            water.From = DateTime.UtcNow.AddMinutes(-200);
+            Settings.Set(Settings.WaterOn, false);
+            if (water.Due() != null) fails++;
+            Settings.Set(Settings.WaterOn, true);
+            if (water.Due() == null) fails++;
+            water.From = DateTime.UtcNow.AddMinutes(-20);
+            if (water.Due() != null) fails++;            // 90 min not up yet
+            Settings.Set(Settings.WaterEvery, 15);
+            if (water.Due() == null) fails++;            // the shorter interval applies to the wait in progress
+
+            var day = new DateTime(2026, 11, 9);
+            var shafii = Prayers.For(day, 5.5);
+            Settings.Set(Settings.Hanafi, true);
+            var hanafi = Prayers.For(day, 5.5);
+            if ((hanafi[3] - shafii[3]).TotalMinutes < 30) fails++;
+            Settings.Set(Settings.PrayerOffset(2), 5);
+            if ((Prayers.For(day, 5.5)[2] - shafii[2]).TotalMinutes != 5) fails++;
+            Settings.Set(Settings.FajrAngle, 15);
+            if (Prayers.For(day, 5.5)[0] <= shafii[0]) fails++;   // a smaller angle means a later Fajr
+        }
+        catch (Exception) { fails++; }
+        finally { Settings.ResetAll(); }
         return fails;
     }
 

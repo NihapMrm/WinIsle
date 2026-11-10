@@ -18,10 +18,12 @@ static class Prayers
     public static double Lat = 7.717, Lon = 81.70;
     public static TimeZoneInfo Zone = TimeZoneInfo.Local;
     static readonly string SettingsFile = AppPaths.For("prayer-settings.txt");
-    const double FajrAngle = 18, IshaAngle = 18; // Asr uses the Shafi'i shadow length of 1
-    // Calibration: minutes added to match your local mosque timetable, then run build.cmd.
-    //                                  Fajr Sunrise Dhuhr Asr Maghrib Isha
-    public static readonly double[] Offset = {   0,    0,     0,   0,    0,    0 };
+    // Angles, Asr method (Shafi'i shadow length 1, Hanafi 2) and the per-prayer calibration minutes (Fajr,
+    // Sunrise, Dhuhr, Asr, Maghrib, Isha) are Control Center settings.
+    static double FajrAngle { get { return Settings.Num(Settings.FajrAngle); } }
+    static double IshaAngle { get { return Settings.Num(Settings.IshaAngle); } }
+    static double AsrShadow { get { return Settings.On(Settings.Hanafi) ? 2 : 1; } }
+    public static double[] Offset { get { return Enumerable.Range(0, 6).Select(i => Settings.Num(Settings.PrayerOffset(i))).ToArray(); } }
     static readonly string[] Names = { "Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha" };
     public static readonly string[] SlotNames = { "Fajr", "Dhuhr", "Asr", "Maghrib", "Isha" };
     public static readonly int[] SlotTimes = { 0, 2, 3, 4, 5 }; // index of each prayer in For()
@@ -80,14 +82,15 @@ static class Prayers
                 double noon = 12 - eqt;
                 if (i == 2) { solar[i] = noon; continue; }
                 double alt = i == 0 ? -FajrAngle : i == 5 ? -IshaAngle
-                    : i == 3 ? Deg(Math.Atan(1 / (1 + Math.Tan(Math.Abs(lat - decl))))) : -0.833;
+                    : i == 3 ? Deg(Math.Atan(1 / (AsrShadow + Math.Tan(Math.Abs(lat - decl))))) : -0.833;
                 // ponytail: clamped so far-north locations can't crash; add a high-latitude rule if one is ever used past about 48 degrees.
                 double cosH = (Math.Sin(Rad(alt)) - Math.Sin(decl) * Math.Sin(lat)) / (Math.Cos(decl) * Math.Cos(lat));
                 double hours = Deg(Math.Acos(Math.Max(-1, Math.Min(1, cosH)))) / 15;
                 solar[i] = noon + (i < 2 ? -hours : hours);
             }
         // Rounded up so a reminder never fires before the time has actually entered.
-        return solar.Select((h, i) => day.Date.AddMinutes(Math.Ceiling((h + tz - Lon / 15) * 60 + Offset[i]))).ToArray();
+        var offset = Offset;
+        return solar.Select((h, i) => day.Date.AddMinutes(Math.Ceiling((h + tz - Lon / 15) * 60 + offset[i]))).ToArray();
     }
 
     // The prayer whose time is running now. Null between sunrise and Dhuhr, when none is due.
