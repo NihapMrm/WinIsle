@@ -115,6 +115,19 @@ static class Checks
             if (!Settings.On(Settings.Screenshots)) fails++;
             Settings.ResetAll();
             if (Settings.On(Settings.Screenshots) || Settings.Num(Settings.WaterEvery) != 90) fails++;
+
+            // The notification thread reads settings while Reset runs on the UI thread: no read may ever fail.
+            int readFailures = 0;
+            bool stop = false;
+            var reader = new System.Threading.Thread(() =>
+            {
+                while (!stop) try { Settings.On(Settings.NotifyOn); Settings.On(Settings.HideBanners); } catch (Exception) { readFailures++; }
+            });
+            reader.Start();
+            for (int i = 0; i < 3000; i++) Settings.ResetAll();
+            stop = true;
+            reader.Join();
+            if (readFailures > 0) fails++;
         }
         catch (Exception) { fails++; }
         finally

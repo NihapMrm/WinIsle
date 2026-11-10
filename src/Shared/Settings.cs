@@ -60,9 +60,10 @@ static class Settings
         Defaults();
     }
 
+    // Overwrites in place, never clearing: the notification thread reads these while Reset runs on the UI
+    // thread, and a key missing for a moment would throw there and close the app.
     static void Defaults()
     {
-        values.Clear();
         unknown.Clear();
         foreach (var d in Defs) values[d.Key] = d.Value.Default;
     }

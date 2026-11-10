@@ -80,15 +80,16 @@ class WindowsNotifications : IReminder
         {
             // Banners are hidden only while notifications show on the island and that switch is on; switched
             // off, Windows' own banners come back at once.
-            bool hide = Settings.On(Settings.NotifyOn) && Settings.On(Settings.HideBanners);
-            if (hid != hide)
-            {
-                if (!hide) try { RestoreBanners(SettingsKey); } catch (Exception) { }
-                else if (hid != null) hideAll = true;
-                hid = hide;
-            }
+            bool hide = hid ?? true;
             try
             {
+                hide = Settings.On(Settings.NotifyOn) && Settings.On(Settings.HideBanners);
+                if (hid != hide)
+                {
+                    if (!hide) try { RestoreBanners(SettingsKey); } catch (Exception) { }
+                    else if (hid != null) hideAll = true;
+                    hid = hide;
+                }
                 var listener = UserNotificationListener.Current; // fetched on this thread, not passed from the UI thread
                 if (listener.GetAccessStatus() == UserNotificationListenerAccessStatus.Allowed)
                 {
