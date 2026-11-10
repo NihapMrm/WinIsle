@@ -12,8 +12,9 @@ static class ChargeWatcher
         {
             var power = BatteryReminder.ReadSystem();
             if (power == null) return;
-            if (wasCharging == false && power.Value.Charging) pluggedIn(power.Value.Percent);
-            if (wasCharging == true && !power.Value.Charging) unplugged(power.Value.Percent);
+            bool show = Settings.On(Settings.ChargeAnim); // switched off in the Control Center: still tracks the charger
+            if (show && wasCharging == false && power.Value.Charging) pluggedIn(power.Value.Percent);
+            if (show && wasCharging == true &&!power.Value.Charging) unplugged(power.Value.Percent);
             wasCharging = power.Value.Charging;
         };
         timer.Start();

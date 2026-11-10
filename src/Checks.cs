@@ -30,7 +30,7 @@ static class Checks
     if (WaterReminder.Every != TimeSpan.FromMinutes(90)) fails++;
     if (WaterReminder.Snooze != TimeSpan.FromMinutes(10)) fails++;
     if (Prayers.ValidLocation(91, 0) || Prayers.ValidLocation(0, 181) || !Prayers.ValidLocation(7.7, 81.7)) fails++;
-    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
+    return fails + SettingsFailures() + LiveReminderFailures() + NotifyClipSettingFailures() + FlashSettingFailures() + DataMoveFailures() + SoundFailures() + NotificationFailures() + BannerFailures() + MediaFailures() + BatteryFailures() + TimerFailures() + ClipboardFailures() + ShelfFailures() + WatcherFailures();
     }
 
     // Flashes and watchers: the pure parts (names, levels, matching).
@@ -191,6 +191,30 @@ static class Checks
             if (history.Items.Count != 11) fails++;
             history.ClearUnpinned();
             if (history.Items.Count != 1 || history.Items[0].Text != "pinned") fails++;
+        }
+        catch (Exception) { fails++; }
+        finally { Settings.ResetAll(); }
+        return fails;
+    }
+
+    // Each flash can be switched off in the Control Center; screenshots and others always pass.
+    static int FlashSettingFailures()
+    {
+        int fails = 0;
+        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        try
+        {
+            var volume = VolumeWatcher.Notice(0.5f, false);
+            var brightness = BrightnessWatcher.Notice(40);
+            var bluetooth = BluetoothWatcher.Notice("Buds", true, 80);
+            var screenshot = new IslandNotice { Key = "screenshot" };
+            if (!Program.Allowed(volume) || !Program.Allowed(brightness) || !Program.Allowed(bluetooth) || !Program.Allowed(screenshot)) fails++;
+            Settings.Set(Settings.FlashVolume, false);
+            if (Program.Allowed(volume) || !Program.Allowed(brightness)) fails++;
+            Settings.Set(Settings.FlashBrightness, false);
+            if (Program.Allowed(brightness) || !Program.Allowed(bluetooth)) fails++;
+            Settings.Set(Settings.FlashBluetooth, false);
+            if (Program.Allowed(bluetooth) || !Program.Allowed(screenshot)) fails++;
         }
         catch (Exception) { fails++; }
         finally { Settings.ResetAll(); }

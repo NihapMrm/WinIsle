@@ -10,7 +10,7 @@ using System.Windows.Media.Animation;
 // each flash stays FlashMs after its last update. Also the camera / microphone in-use dots beside the island.
 partial class IslandWindow
 {
-    const int FlashMs = 2200;
+    static int FlashMs { get { return (int)(Settings.Num(Settings.FlashSeconds) * 1000); } } // Control Center
     const double LevelW = 120;
 
     readonly Border levelFill = new Border { Height = 6, Width = 0, CornerRadius = new CornerRadius(3), HorizontalAlignment = HorizontalAlignment.Left };
@@ -95,6 +95,7 @@ partial class IslandWindow
     internal void Flash(IslandNotice n)
     {
         if (n.Key == "volume" && n.Level.HasValue) ShowPlayerVolume(n.Level.Value, n.Time == "Muted"); // the player's bar follows every change
+        if (!Program.Allowed(n)) return; // switched off in the Control Center
         if (shown != null && !flashing) return; // a reminder is on screen and matters more
         if (mirrorOn || timerOpen || shelfOpen || (mediaOpen && IsMouseOver)) return; // never pull the island from under the mouse
         flashUntil = DateTime.UtcNow.AddMilliseconds(FlashMs);

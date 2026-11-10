@@ -12,7 +12,7 @@ using System.Windows.Threading;
 partial class IslandWindow
 {
     const double ChargeW = 320, ChargeH = 64, ChargeR = 32, BatteryInnerW = 38;
-    const int ChargeMs = 5000;
+    static int ChargeMs { get { return (int)(Settings.Num(Settings.ChargeSeconds) * 1000); } } // Control Center
     static readonly Geometry Bolt = Geometry.Parse("M13.5,2 L5,13.5 H11 L9.5,22 L19,9.5 H12.8 Z");
     static readonly Color ChargeGreen = Color.FromRgb(48, 209, 88), ChargeLow = Color.FromRgb(255, 120, 60);
 

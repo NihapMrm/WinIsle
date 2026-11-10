@@ -15,7 +15,12 @@ static class PrivacyWatcher
         var timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1.5) };
         timer.Tick += (s, e) =>
         {
-            try { island.ShowInUse(InUse("webcam"), InUse("microphone")); } catch (Exception) { }
+            try
+            {
+                if (Settings.On(Settings.Dots)) island.ShowInUse(InUse("webcam"), InUse("microphone"));
+                else island.ShowInUse(new List<string>(), new List<string>()); // switched off in the Control Center
+            }
+            catch (Exception) { }
         };
         timer.Start();
     }

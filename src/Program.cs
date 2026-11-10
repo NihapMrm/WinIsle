@@ -71,6 +71,18 @@ static class Program
 
     internal static ClipboardWindow ClipboardPanel; // Ctrl+Alt+V and the island's clipboard button
     internal static ClipboardHistory Clipboard;     // the Control Center's "Clear history"
+
+    // Volume, brightness and Bluetooth flashes can each be switched off in the Control Center; others always show.
+    internal static bool Allowed(IslandNotice n)
+    {
+        switch (n.Key)
+        {
+            case "volume": return Settings.On(Settings.FlashVolume);
+            case "brightness": return Settings.On(Settings.FlashBrightness);
+            case "bluetooth": return Settings.On(Settings.FlashBluetooth);
+            default: return true;
+        }
+    }
     static VolumeWatcher volume; // Windows holds only a COM pointer, so the app keeps it alive
 
     internal static void StartReminders()
