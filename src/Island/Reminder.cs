@@ -15,6 +15,9 @@ class IslandNotice
     public bool LoopSound; // Sound repeats until the island closes
     public double? Level;  // flashes only: 0..1 shown as a bar in place of the title (volume, brightness, charge)
     public Action<double> SetLevel; // flashes only: set when the bar can be dragged or scrolled to change the level
+    public bool Later;       // adds a "Later" button offering LaterChoices
+    public TimeSpan? LaterBy; // set by the island when a Later choice is clicked, just before Answer(shown, false)
+    public static readonly TimeSpan[] LaterChoices = { TimeSpan.FromMinutes(30), TimeSpan.FromHours(1), TimeSpan.FromHours(2), TimeSpan.FromHours(3) };
 }
 
 // The two labels of the compact pill after an answer.
@@ -22,8 +25,12 @@ class IslandResult
 {
     public string Left, Right;
 
-    // "10 min" or "20 sec"
-    public static string Span(TimeSpan t) { return t.TotalMinutes >= 1 ? (int)t.TotalMinutes + " min" : (int)t.TotalSeconds + " sec"; }
+    // "2 hr", "10 min" or "20 sec"
+    public static string Span(TimeSpan t)
+    {
+        if (t.TotalHours >= 1 && t.TotalMinutes % 60 == 0) return (int)t.TotalHours + " hr";
+        return t.TotalMinutes >= 1 ? (int)t.TotalMinutes + " min" : (int)t.TotalSeconds + " sec";
+    }
     public static IslandResult NotYet(TimeSpan snooze) { return new IslandResult { Left = "Not yet", Right = "Back in " + Span(snooze) }; }
 }
 

@@ -156,9 +156,10 @@ class WindowsNotifications : IReminder
 
     public IslandNotice Due()
     {
-        if (isLive && !Settings.On(Settings.NotifyOn)) { current = null; waiting.Clear(); return null; }
+        // Off or Do not disturb: dropped, not queued; they're still in Windows' Notification Center.
         Incoming item;
         while (incoming.TryDequeue(out item)) waiting.Add(item);
+        if (isLive && (!Settings.On(Settings.NotifyOn) || Settings.On(Settings.Dnd))) { current = null; waiting.Clear(); return null; }
         if (current != null && DateTime.UtcNow >= until) current = null; // ran out while a prayer or water reminder took over
         if (current != null || waiting.Count == 0) return current;
         var head = waiting.FirstOrDefault(IsCall) ?? waiting[0]; // a call goes ahead of the queue and never merges

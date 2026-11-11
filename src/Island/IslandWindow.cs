@@ -83,9 +83,11 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round,
         StrokeDashArray = new DoubleCollection { 9, 9 }, StrokeDashOffset = 9,
     };
-    Grid compact, header, actions, tile;
+    Grid compact, header, actions, laterRow, tile;
     TextBlock yesLabel, noLabel;
-    Border yesButton, noButton;
+    Border yesButton, noButton, laterButton;
+    Border[] laterChips; // 30 min, 1, 2, 3 hr: replace the actions after "Later"
+    TextBlock dndGlyph;  // the player's Do not disturb button, lit while on
 
     // Media player parts.
     readonly Border art = new Border { Width = 56, Height = 56, CornerRadius = new CornerRadius(12), HorizontalAlignment = HorizontalAlignment.Left };
@@ -201,18 +203,33 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         header.Children.Add(timeText);
 
         actions = Layer(0, 0, 0);
-        actions.ColumnDefinitions.Add(new ColumnDefinition());
-        actions.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
-        actions.ColumnDefinitions.Add(new ColumnDefinition());
-        var notYet = MakeButton(Label("Not yet", Colors.White), Color.FromArgb(38, 255, 255, 255), Color.FromArgb(64, 255, 255, 255), () => Answer(false));
+        // Not yet | Later (only when the notice offers it) | Yes
+        for (int i = 0; i < 5; i++) actions.ColumnDefinitions.Add(new ColumnDefinition { Width = i % 2 == 1 ? new GridLength(8) : new GridLength(1, GridUnitType.Star) });
+        Color soft = Color.FromArgb(38, 255, 255, 255), softHover = Color.FromArgb(64, 255, 255, 255);
+        var notYet = MakeButton(Label("Not yet", Colors.White), soft, softHover, () => Answer(false));
         var yes = MakeButton(Label("Yes", Color.FromRgb(4, 40, 16)), Green, Color.FromRgb(76, 224, 112), () => Answer(true));
+        laterButton = MakeButton(Label("Later", Colors.White), soft, softHover, ShowLater);
         yesLabel = (TextBlock)yes.Child;
         noLabel = (TextBlock)notYet.Child;
         yesButton = yes;
         noButton = notYet;
-        Grid.SetColumn(yes, 2);
+        Grid.SetColumn(laterButton, 2);
+        Grid.SetColumn(yes, 4);
         actions.Children.Add(notYet);
+        actions.Children.Add(laterButton);
         actions.Children.Add(yes);
+
+        laterRow = Layer(0, 0, 0);
+        laterChips = new Border[IslandNotice.LaterChoices.Length];
+        for (int i = 0; i < laterChips.Length; i++)
+        {
+            var after = IslandNotice.LaterChoices[i];
+            if (i > 0) laterRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(8) });
+            laterRow.ColumnDefinitions.Add(new ColumnDefinition());
+            var chip = laterChips[i] = MakeButton(Label(IslandResult.Span(after), Colors.White), soft, softHover, () => AnswerLater(after));
+            Grid.SetColumn(chip, 2 * i);
+            laterRow.Children.Add(chip);
+        }
 
         mediaLayer = BuildPlayer();
         mirrorLayer = Layer(MirrorW, MirrorH, 0); // starts at the screen edge, like the player
@@ -226,6 +243,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         content.Children.Add(compact);
         content.Children.Add(header);
         content.Children.Add(actions);
+        content.Children.Add(laterRow);
         content.Children.Add(mediaLayer);
         content.Children.Add(mirrorLayer);
         timerLayer = BuildTimer();
@@ -333,6 +351,22 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         track.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(68) });
         track.ColumnDefinitions.Add(new ColumnDefinition());
         track.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        track.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        // Do not disturb, top right: a bell, slashed and purple while on.
+        dndGlyph = new TextBlock { FontFamily = Icons, FontSize = 14, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        var dnd = RoundButton(dndGlyph, 30, Color.FromArgb(0, 255, 255, 255), Color.FromArgb(40, 255, 255, 255), () => Settings.Set(Settings.Dnd, !Settings.On(Settings.Dnd)));
+        dnd.VerticalAlignment = VerticalAlignment.Top;
+        dnd.Margin = new Thickness(4, -4, -4, 0);
+        Grid.SetColumn(dnd, 3);
+        track.Children.Add(dnd);
+        Action showDnd = () =>
+        {
+            bool on = Settings.On(Settings.Dnd);
+            dndGlyph.Text = on ? "" : ""; // RingerSilent (bell, slashed) : Ringer (bell)
+            dndGlyph.Foreground = on ? new SolidColorBrush(Color.FromRgb(175, 130, 255)) : Brushes.White;
+        };
+        showDnd();
+        Settings.Changed += showDnd; // also switched from the Control Center
         var names = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
         names.Children.Add(mediaTitle);
         names.Children.Add(mediaArtist);
@@ -398,14 +432,14 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         int dueIndex = -1;
         for (int i = 0; i < reminders.Length && due == null; i++)
         {
-            due = reminders[i].Due();
-            if (due != null) dueIndex = i;
+            var n = reminders[i].Due(); // asked even when muted: notifications drop what arrives meanwhile
+            if (n != null && !Muted(i)) { due = n; dueIndex = i; }
         }
         if (shown != null)
         {
             if (!open || expanded) return; // an expanded notice stays until a button is clicked
-            // A higher-priority reminder takes over; this one stays due and returns afterwards.
-            if ((due != null && dueIndex < shownIndex && !shown.Sticky) || !reminders[shownIndex].StillCurrent(shown)) Dismiss();
+            // A higher-priority reminder takes over; this one stays due and returns afterwards (also after Do not disturb).
+            if ((due != null && dueIndex < shownIndex && !shown.Sticky) || !reminders[shownIndex].StillCurrent(shown) || Muted(shownIndex)) Dismiss();
             return;
         }
         // Reminders wait while the mirror is open or the mouse is on the island (so an open timer panel
@@ -417,6 +451,28 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
             return;
         }
         UpdatePlayer();
+    }
+
+    // Do not disturb holds every reminder and notification; the timer alarm and Control Center previews still show.
+    bool Muted(int i)
+    {
+        return Settings.On(Settings.Dnd) && !(reminders[i] is PreviewReminder) && !(reminders[i] is CountdownTimer);
+    }
+
+    // "Later" swaps the buttons for the choices.
+    void ShowLater()
+    {
+        if (!open) return;
+        laterRow.Margin = actions.Margin;
+        Conceal(actions);
+        Reveal(laterRow, 60);
+    }
+
+    void AnswerLater(TimeSpan after)
+    {
+        if (!open) return;
+        shown.LaterBy = after;
+        Answer(false);
     }
 
     internal void Answer(bool yes)
@@ -432,6 +488,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         compactRight.Text = result.Right;
         Conceal(header);
         Conceal(actions);
+        Conceal(laterRow);
         Morph(CompactW, CompactH, CompactH / 2);
         Reveal(compact, 110);
         if (yes)
@@ -455,6 +512,9 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         detailText.Text = notice.Detail;
         yesLabel.Text = notice.YesLabel;
         noLabel.Text = notice.NoLabel ?? "Not yet";
+        actions.ColumnDefinitions[2].Width = notice.Later ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+        actions.ColumnDefinitions[3].Width = new GridLength(notice.Later ? 8 : 0);
+        laterButton.Visibility = notice.Later ? Visibility.Visible : Visibility.Collapsed;
         expanded = false;
         header.Cursor = notice.More == null ? null : Cursors.Hand;
         size = notice.Small ? Small : Regular;
@@ -486,8 +546,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
             Morph(size.Width, size.OpenH + extra, size.OpenR);
             Conceal(compact);
             Reveal(header, 70);
-            Reveal(actions, 140);
-            glow.BeginAnimation(OpacityProperty, new DoubleAnimation(0.25, 1, TimeSpan.FromMilliseconds(1600))
+            Reveal(actions, 140);            glow.BeginAnimation(OpacityProperty, new DoubleAnimation(0.25, 1, TimeSpan.FromMilliseconds(1600))
             {
                 AutoReverse = true, RepeatBehavior = RepeatBehavior.Forever,
                 EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut },
@@ -518,15 +577,19 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         tile.Margin = new Thickness(0, 0, s.Gap, 0);
         bigLogo.Clip = new EllipseGeometry(new Point(s.Tile / 2, s.Tile / 2), s.Tile / 2, s.Tile / 2);
         bigIcon.Width = bigIcon.Height = s.IconSize;
-        yesButton.CornerRadius = noButton.CornerRadius = new CornerRadius(s.ButtonH / 2);
-        yesLabel.FontSize = noLabel.FontSize = s.ButtonFont;
+        foreach (var b in laterChips.Concat(new[] { yesButton, noButton, laterButton }))
+        {
+            b.CornerRadius = new CornerRadius(s.ButtonH / 2);
+            ((TextBlock)b.Child).FontSize = s.ButtonFont;
+        }
         detailText.Measure(new Size(s.TextW, double.PositiveInfinity));
         double extra = Math.Max(0, detailText.DesiredSize.Height - s.LineH);
         header.Width = s.Width - 2 * s.Pad - 8;
         header.Height = s.Tile + extra;
         header.Margin = new Thickness(0, Inset + s.Pad, 0, 0);
         actions.Width = s.Width - 2 * s.Pad;
-        actions.Height = s.ButtonH;
+        actions.Height = laterRow.Height = s.ButtonH;
+        laterRow.Width = actions.Width;
         actions.BeginAnimation(MarginProperty, null); // a finished expand animation would otherwise hold its value
         actions.Margin = new Thickness(0, Inset + 2 * s.Pad + s.Tile + extra, 0, 0);
         return extra;
@@ -548,6 +611,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         Conceal(compact);
         Conceal(header);
         Conceal(actions);
+        Conceal(laterRow);
         Morph(SeedW, SeedH, SeedH / 2);
         Go(stage, OpacityProperty, 0, 200, Out, 80, null, null);
         int gen = stageGen;
@@ -794,7 +858,7 @@ partial class IslandWindow : GlassWindow // the file shelf lives in IslandWindow
         mediaNow = m;
         mediaTitle.Text = m.Title == "" ? "Playing" : m.Title;
         mediaArtist.Text = m.Artist;
-        mediaTitle.MaxWidth = mediaArtist.MaxWidth = MediaW - 2 * MediaPad - 68 - 26;
+        mediaTitle.MaxWidth = mediaArtist.MaxWidth = MediaW - 2 * MediaPad - 68 - 26 - 30; // art, app icon, Do not disturb
         if (m.Art != artBytes || art.Background == null)
         {
             artBytes = m.Art;

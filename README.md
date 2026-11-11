@@ -111,6 +111,8 @@ The island sits at the very top centre of the screen and changes shape with smoo
 
 **Priority order** (highest first): timer alarm, battery, prayer, water, Windows notifications. A higher one replaces a lower one that is waiting, and the lower one comes back afterwards. Calls and the timer alarm stay until you answer them.
 
+**Do not disturb** (Control Center: General, or the bell button at the top right of the media player, slashed and purple while on) keeps every reminder and notification off the island. Prayer, water and battery reminders that come due wait until it is off. Windows notifications are dropped from the island but stay in Windows' Notification Center. The timer alarm, Control Center previews and flashes still show.
+
 While your mouse is on the island, or the mirror is open, reminders wait. Calls and the timer alarm do not wait.
 
 **Flashes** are brief messages without buttons. Each one shows briefly:
@@ -142,8 +144,9 @@ Flashes last about 2.2 seconds (Control Center: Flashes), and each kind can be s
 
 ### Reminders
 
-- At each prayer time, the island shows the prayer with **Not yet** and **Prayed**.
+- At each prayer time, the island shows the prayer with **Not yet**, **Later** and **Prayed**.
 - **Not yet** brings the reminder back every 10 minutes until you press **Prayed**.
+- **Later** offers 30 min, 1 hr, 2 hr and 3 hr. If the chosen time reaches the next prayer's time, the pill says **Skipped**: the reminder doesn't come back, and the prayer counts as **Missed** unless you mark it prayed in the dashboard.
 - If you never press **Prayed** before the next prayer starts, that prayer counts as **Missed**.
 - The Fajr reminder stops at sunrise. Fajr is still marked Missed only when Dhuhr starts.
 - If the PC was off during a prayer, that prayer counts as Missed. You can correct it in the dashboard.

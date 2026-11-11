@@ -187,6 +187,8 @@ partial class ControlCenter
         }
         return new UIElement[]
         {
+            Section("Do not disturb", "Keeps reminders and notifications off the island", Toggle(Settings.Dnd, "Do not disturb"),
+                Line("Still shows", "The timer alarm, previews and flashes. Reminders wait until it's off; notifications stay in Windows' Notification Center. Also the bell at the top of the island's player", new Border())),
             Section("Startup", "How MyTodo starts", null,
                 Line("Start with Windows", "A shortcut in your Startup folder", startup),
                 Line("Show todo panel on start", "Applies next time MyTodo starts", Toggle(Settings.ShowPanel, "Show todo panel on start"))),

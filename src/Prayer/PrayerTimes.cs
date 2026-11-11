@@ -93,6 +93,12 @@ static class Prayers
         return solar.Select((h, i) => day.Date.AddMinutes(Math.Ceiling((h + tz - Lon / 15) * 60 + offset[i]))).ToArray();
     }
 
+    // When the time after p's starts (Sunrise ends Fajr); the reminder stops there and Tracker counts it missed if not prayed.
+    public static DateTime EndOf(Prayer p, double tz)
+    {
+        return For(p.At, tz).Concat(For(p.At.AddDays(1), tz)).First(t => t > p.At);
+    }
+
     // The prayer whose time is running now. Null between sunrise and Dhuhr, when none is due.
     public static Prayer Current(DateTime now, double tz)
     {

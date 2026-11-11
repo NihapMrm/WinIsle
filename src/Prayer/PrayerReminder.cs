@@ -53,7 +53,7 @@ class PrayerReminder : IReminder
         return new IslandNotice
         {
             Key = p.Key, Title = p.Name, Detail = "It's time to pray", YesLabel = "Prayed",
-            Time = p.At.ToString("h:mm tt", CultureInfo.InvariantCulture), Icon = MoonShape, Accent = Gold,
+            Time = p.At.ToString("h:mm tt", CultureInfo.InvariantCulture), Icon = MoonShape, Accent = Gold, Later = true,
         };
     }
 
@@ -76,9 +76,13 @@ class PrayerReminder : IReminder
     {
         if (!yes)
         {
+            var wait = shown.LaterBy ?? snooze();
+            var p = current();
             snoozedKey = shown.Key;
-            snoozedUntil = Prayers.Now + snooze();
-            return IslandResult.NotYet(snooze());
+            snoozedUntil = Prayers.Now + wait;
+            // Past the next prayer's time it never comes back: this one ends unprayed and counts as missed.
+            if (p != null && p.Key == shown.Key && snoozedUntil >= Prayers.EndOf(p, Prayers.TzAt(p.At))) return new IslandResult { Left = "Skipped", Right = shown.Title };
+            return IslandResult.NotYet(wait);
         }
         markDone(shown.Key);
         return new IslandResult { Left = "Prayed", Right = shown.Title };

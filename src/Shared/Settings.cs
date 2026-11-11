@@ -9,7 +9,7 @@ using System.Linq;
 // unknown keys are kept, bad values fall back to the default, and numbers are clamped to their range.
 static class Settings
 {
-    internal const string ShowPanel = "general.showPanel";
+    internal const string ShowPanel = "general.showPanel", Dnd = "general.dnd";
     internal const string WaterOn = "water.on", WaterEvery = "water.every", WaterSnooze = "water.snooze";
     internal const string PrayerOn = "prayer.on", PrayerSnooze = "prayer.snooze", FajrAngle = "prayer.fajrAngle", IshaAngle = "prayer.ishaAngle", Hanafi = "prayer.hanafi";
     internal const string BatteryOn = "battery.on", BatteryLow = "battery.low", BatteryFull = "battery.full", BatteryAgain = "battery.again";
@@ -41,7 +41,7 @@ static class Settings
 
     static Settings()
     {
-        Flag(ShowPanel, true);
+        Flag(ShowPanel, true); Flag(Dnd, false);
         Flag(WaterOn, true); Number(WaterEvery, 90, 15, 480); Number(WaterSnooze, 10, 1, 120);
         Flag(PrayerOn, true); Number(PrayerSnooze, 10, 1, 60);
         for (int i = 0; i < 6; i++) Number(PrayerOffset(i), 0, -30, 30);

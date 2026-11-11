@@ -16,6 +16,10 @@ static class Checks
     if (at(8) != null) fails++;
     if (at(16) != "2026-11-09 Asr") fails++;
     if (at(23) != "2026-11-09 Isha") fails++;
+    // "Later" past the end of a prayer skips it: each ends when the next time starts (Sunrise ends Fajr, Fajr ends Isha).
+    Func<int, DateTime> endAt = h => Prayers.EndOf(Prayers.Current(day.AddHours(h), 5.5), 5.5);
+    if (endAt(16) != t[4] || endAt(5) != t[1] || endAt(3) != t[0]) fails++;
+    if (IslandResult.Span(TimeSpan.FromHours(2)) != "2 hr" || IslandResult.Span(TimeSpan.FromMinutes(90)) != "90 min" || IslandResult.Span(TimeSpan.FromMinutes(30)) != "30 min") fails++;
 
     // A prayer is Missed exactly when the next prayer starts, unless Prayed was clicked.
     DateTime start = day.AddHours(12), end = day.AddHours(15), since = day;
