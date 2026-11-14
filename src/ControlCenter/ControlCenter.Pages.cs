@@ -363,7 +363,8 @@ partial class ControlCenter
         {
             Section("WinIsle", "Built " + File.GetLastWriteTime(exe).ToString("MMM d, yyyy h:mm tt", Inv), null,
                 Line("Data folder", AppPaths.Folder, Button("Open", null, () => { try { Process.Start("explorer.exe", "\"" + AppPaths.Folder + "\""); } catch (Exception) { } })),
-                checkRow),
+                checkRow,
+                Line("First-run setup", "Explains each feature again, with its switch", Button("Run setup", null, SetupWindow.Open))),
             Section("Reset and quit", "Reset puts every setting back to its default; your tasks, prayers and pins stay", null,
                 Buttons(reset, Button("Quit WinIsle", null, () => Application.Current.Shutdown()))),
         };

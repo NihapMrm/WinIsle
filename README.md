@@ -41,7 +41,7 @@ It is written in C# 5 with WPF, built with the .NET Framework compiler that come
 ## Quick start
 
 1. Install: download [WinIsle-Setup.exe](https://github.com/NihapMrm/WinIsle/releases/latest/download/WinIsle-Setup.exe) and run it. See the [install page](https://nihapmrm.github.io/WinIsle/) for help, including the SmartScreen warning. Or use the portable `WinIsle.exe` from [Releases](https://github.com/NihapMrm/WinIsle/releases), or build it yourself with `build.cmd` (see [Building and running](#building-and-running)).
-2. Run `WinIsle.exe`. The todo panel appears, and a thin glass line appears at the top centre of the screen. That line is the island.
+2. Run `WinIsle.exe`. On first start, a short setup explains each feature and lets you turn it on or off; run it again any time from Control Center: About. The todo panel appears, and a thin glass line appears at the top centre of the screen. That line is the island.
 3. To start it with Windows, turn on **Start with Windows** in the Control Center's General page. It adds **WinIsle.lnk** to your Startup folder.
 
 Only one copy runs at a time. Starting WinIsle again, for example from the Start menu, shows the running copy's todo panel.
@@ -73,7 +73,7 @@ One window that controls the whole app. Open it with `Ctrl+Alt+S`, the gear butt
 - **Values:** reminder intervals and snoozes, battery thresholds, how long notifications and flashes show, the charging animation's length, prayer offsets and angles, the Asr method (Shafi'i or Hanafi), call words, volume step, clipboard size and sound volume.
 - **Linked switches:** turning notifications off the island brings Windows' own banners back. Turning the volume flash off gives the volume keys back to Windows, so its own pop-up shows.
 - **Preview** buttons show a reminder or animation on the island without changing anything real: no water timer reset, no prayer marked.
-- **About:** open the data folder, run the self-checks, quit, or reset every setting (click twice). Reset keeps your tasks, prayer log and pins.
+- **About:** open the data folder, run the self-checks, run the first-run setup again, quit, or reset every setting (click twice). Reset keeps your tasks, prayer log and pins.
 - **Start with Windows** (General) adds or removes the shortcut in your Startup folder.
 
 Settings are saved in `settings.txt` in the [data folder](#where-data-is-stored). A damaged file never stops the app: unknown lines are ignored, and bad values fall back to their defaults.
@@ -419,6 +419,7 @@ src/
     Settings.cs               Every Control Center setting, kept in settings.txt
     Startup.cs                Start with Windows (Startup folder shortcut)
   Todo/TodoPanel.cs           Todo panel and global hotkeys
+  Setup/SetupWindow.cs        First-run setup: each feature explained, with its switch
   Dashboard/DashboardWindow.cs  Shared widgets: cards, pills, dropdowns, switches, steppers
   ControlCenter/
     ControlCenter.cs          The window, page list and page switching

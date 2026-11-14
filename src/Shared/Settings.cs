@@ -21,7 +21,7 @@ static class Settings
     internal const string Screenshots = "shelf.screenshots";
     internal const string SoundOn = "sound.on", SoundVolume = "sound.volume";
     internal const string SoundReminders = "sound.reminders", SoundAlarms = "sound.alarms", SoundNotifications = "sound.notifications", SoundFlashes = "sound.flashes", SoundTicks = "sound.ticks";
-    internal const string LastPage = "ui.lastPage";
+    internal const string LastPage = "ui.lastPage", SetupDone = "ui.setupDone";
 
     // Minutes added to each prayer time (0..5 = Fajr, Sunrise, Dhuhr, Asr, Maghrib, Isha).
     internal static string PrayerOffset(int i) { return "prayer.offset." + i; }
@@ -56,7 +56,7 @@ static class Settings
         Flag(Screenshots, false);
         Flag(SoundOn, true); Number(SoundVolume, 100, 0, 100);
         foreach (var kind in new[] { SoundReminders, SoundAlarms, SoundNotifications, SoundFlashes, SoundTicks }) Flag(kind, true);
-        Words(LastPage, "General");
+        Words(LastPage, "General"); Flag(SetupDone, false);
         Defaults();
     }
 

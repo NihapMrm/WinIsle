@@ -117,5 +117,6 @@ static class Program
             Key = "clipboard-busy", Title = "Clipboard busy", Time = holder, Accent = System.Windows.Media.Color.FromRgb(255, 159, 10),
             Icon = System.Windows.Media.Geometry.Parse("M12,2 L22,20 H2 Z M11,9 V14 H13 V9 Z M11,16 V18 H13 V16 Z"), Sound = IslandSound.NotYet,
         });
+        if (!Settings.On(Settings.SetupDone)) SetupWindow.Open(); // first run; About in the Control Center runs it again
     }
 }
