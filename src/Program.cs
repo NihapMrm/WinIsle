@@ -60,8 +60,12 @@ static class Program
             : args.Contains("--demo") ? (IReminder)PrayerReminder.Demo() : null;
         if (demo == null)
         {
+            bool first;
+            var single = new System.Threading.Mutex(true, "WinIsle.SingleInstance", out first);
+            if (!first) { TodoPanel.ShowRunning(); return; }
             AppPaths.Prepare();
             app.Run(new TodoPanel());
+            GC.KeepAlive(single);
             return;
         }
         var island = new IslandWindow(null, null, null, demo);

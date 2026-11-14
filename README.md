@@ -44,7 +44,7 @@ It is written in C# 5 with WPF, built with the .NET Framework compiler that come
 2. Run `WinIsle.exe`. The todo panel appears, and a thin glass line appears at the top centre of the screen. That line is the island.
 3. To start it with Windows, turn on **Start with Windows** in the Control Center's General page. It adds **WinIsle.lnk** to your Startup folder.
 
-Only one copy can run at a time. A second copy reports that `Ctrl+Alt+T` is already taken and exits.
+Only one copy runs at a time. Starting WinIsle again, for example from the Start menu, shows the running copy's todo panel.
 
 ---
 
@@ -469,7 +469,7 @@ src/
 
 | Problem | Fix |
 |---|---|
-| "Ctrl+Alt+T is already taken" | WinIsle is already running, or another app uses that shortcut |
+| "Ctrl+Alt+T is already used by another app" | Another app holds that shortcut. Close it and start WinIsle again |
 | Build fails: "Could not write to output file ... WinIsle.exe" | The app is still running. Quit it with `Ctrl+Shift+Q`, wait a second, and build again |
 | Notifications don't reach the island | Check **Settings > Privacy & security > Notifications** and allow apps to access notifications |
 | Seeing both a Windows banner and the island | A brand-new app shows one Windows banner before the island takes over. If banners keep appearing, sign out and back in |

@@ -17,6 +17,17 @@ class Item { public string Text; public int State; } // 0 todo, 1 ongoing, 2 don
 class TodoPanel : GlassWindow
 {
     [DllImport("user32.dll")] static extern bool RegisterHotKey(IntPtr hwnd, int id, uint mods, uint vk);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int RegisterWindowMessage(string name);
+    [DllImport("user32.dll")] static extern bool PostMessage(IntPtr hwnd, int msg, IntPtr w, IntPtr l);
+    [DllImport("user32.dll")] static extern bool AllowSetForegroundWindow(int pid);
+
+    // A second launch (Start menu, desktop icon) asks the running copy to show its panel.
+    static readonly int ShowMessage = RegisterWindowMessage("WinIsle.ShowPanel");
+    internal static void ShowRunning()
+    {
+        AllowSetForegroundWindow(-1); // ASFW_ANY: let the running copy come to the front
+        PostMessage(new IntPtr(0xFFFF), ShowMessage, IntPtr.Zero, IntPtr.Zero); // HWND_BROADCAST reaches the hidden panel too
+    }
 
     const int WM_HOTKEY = 0x0312;
     const uint MOD_ALT = 1, MOD_CONTROL = 2, MOD_NOREPEAT = 0x4000, VK_T = 0x54, VK_P = 0x50, VK_V = 0x56, VK_S = 0x53;
@@ -171,13 +182,14 @@ class TodoPanel : GlassWindow
 
         if (!RegisterHotKey(hwnd, 1, MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_T))
         {
-            MessageBox.Show("Ctrl+Alt+T is already taken (is the panel already running?).", "Todo");
+            MessageBox.Show("Ctrl+Alt+T is already used by another app. Close that app, then start WinIsle again.", "WinIsle");
             Application.Current.Shutdown();
             return;
         }
         src.AddHook((IntPtr h, int msg, IntPtr w, IntPtr l, ref bool handled) =>
         {
-            if (msg == WM_HOTKEY)
+            if (msg == ShowMessage) { ShowPanel(); handled = true; }
+            else if (msg == WM_HOTKEY)
             {
                 int id = w.ToInt32();
                 if (id == 2) ControlCenter.Open("Prayer");
