@@ -129,7 +129,7 @@ class WindowsNotifications : IReminder
         catch (Exception) { } // A locked setting just leaves that app's banner on.
     }
 
-    // TodoPanel.exe --restore-banners. Walks nested keys too: some app ids contain backslashes.
+    // WinIsle.exe --restore-banners. Walks nested keys too: some app ids contain backslashes.
     internal static void RestoreBanners(string root)
     {
         using (var key = Registry.CurrentUser.OpenSubKey(root, true))
@@ -181,7 +181,7 @@ class WindowsNotifications : IReminder
     // The Control Center's preview: a made-up message, built exactly as a real one is.
     internal static IslandNotice Sample()
     {
-        return Build(new List<Incoming> { new Incoming { App = "MyTodo", AppId = "", Lines = new[] { "Preview", "This is how notifications look on the island" } } });
+        return Build(new List<Incoming> { new Incoming { App = "WinIsle", AppId = "", Lines = new[] { "Preview", "This is how notifications look on the island" } } });
     }
 
     static IslandNotice Build(List<Incoming> group)

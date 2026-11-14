@@ -7,7 +7,7 @@ static class Startup
 {
     internal static string LinkPath
     {
-        get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), "Todo Panel.lnk"); }
+        get { return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Startup), "WinIsle.lnk"); }
     }
 
     internal static bool Enabled

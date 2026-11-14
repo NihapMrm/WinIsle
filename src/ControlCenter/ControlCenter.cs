@@ -47,7 +47,7 @@ partial class ControlCenter : DashboardWindow
 
     ControlCenter()
     {
-        Title = "MyTodo Control Center";
+        Title = "WinIsle Control Center";
         Width = NavW + PageW;
         Height = Math.Min(816, SystemParameters.WorkArea.Height - 16);
         WindowStyle = WindowStyle.None;

@@ -69,7 +69,7 @@ class ClipboardHistory
         var history = new ClipboardHistory { pinFile = AppPaths.For("clipboard-pins.txt") };
         history.LoadPins();
         // A message-only window that Windows tells about every clipboard change.
-        history.listener = new HwndSource(new HwndSourceParameters("MyTodo clipboard") { ParentWindow = new IntPtr(-3) });
+        history.listener = new HwndSource(new HwndSourceParameters("WinIsle clipboard") { ParentWindow = new IntPtr(-3) });
         history.listener.AddHook(history.Hook);
         AddClipboardFormatListener(history.listener.Handle);
         return history;

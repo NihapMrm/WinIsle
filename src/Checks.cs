@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 
-// TodoPanel.exe --check: exit code is the number of failures. Reference: aladhan.com, same location and angles.
+// WinIsle.exe --check: exit code is the number of failures. Reference: aladhan.com, same location and angles.
 static class Checks
 {
     public static int Run()
@@ -82,7 +82,7 @@ static class Checks
     static int SettingsFailures()
     {
         int fails = 0;
-        var root = Path.Combine(Path.GetTempPath(), "MyTodoSettings" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "WinIsleSettings" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         string path = Path.Combine(root, "settings.txt");
         try
@@ -146,7 +146,7 @@ static class Checks
     static int LiveReminderFailures()
     {
         int fails = 0;
-        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        Settings.Load(Path.Combine(Path.GetTempPath(), "WinIsleNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
         try
         {
             Settings.Set(Settings.BatteryLow, 30);
@@ -188,7 +188,7 @@ static class Checks
     static int NotifyClipSettingFailures()
     {
         int fails = 0;
-        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        Settings.Load(Path.Combine(Path.GetTempPath(), "WinIsleNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
         try
         {
             var calls = WindowsNotifications.CallPattern("incoming call, voice call, video call, calling");
@@ -218,7 +218,7 @@ static class Checks
     static int FlashSettingFailures()
     {
         int fails = 0;
-        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        Settings.Load(Path.Combine(Path.GetTempPath(), "WinIsleNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
         try
         {
             var volume = VolumeWatcher.Notice(0.5f, false);
@@ -242,7 +242,7 @@ static class Checks
     static int VolumeSettingFailures()
     {
         int fails = 0;
-        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        Settings.Load(Path.Combine(Path.GetTempPath(), "WinIsleNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
         try
         {
             if (!VolumeWatcher.TakeKeys()) fails++;
@@ -263,7 +263,7 @@ static class Checks
     static int SoundSettingFailures()
     {
         int fails = 0;
-        Settings.Load(Path.Combine(Path.GetTempPath(), "MyTodoNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
+        Settings.Load(Path.Combine(Path.GetTempPath(), "WinIsleNone" + Guid.NewGuid().ToString("N"), "settings.txt"));
         Func<byte[], int> peak = wav => { int p = 0; for (int i = 44; i < wav.Length; i += 2) p = Math.Max(p, Math.Abs((int)BitConverter.ToInt16(wav, i))); return p; };
         try
         {
@@ -317,7 +317,7 @@ static class Checks
         if (Math.Abs(ControlCenter.StepValue(2.2, 0.2, 1, 6, 1) - 2.4) > 1e-9 || ControlCenter.StepValue(92, 5, 15, 480, 1) != 95) fails++;
         if (ControlCenter.StepValue(478, 5, 15, 480, 1) != 480 || ControlCenter.StepValue(-29, 1, -30, 30, -1) != -30) fails++;
         if (ControlCenter.Pages[0] != "Prayer" || ControlCenter.Pages.Length != 11) fails++;
-        if (!Startup.LinkPath.EndsWith(@"\Microsoft\Windows\Start Menu\Programs\Startup\Todo Panel.lnk", StringComparison.OrdinalIgnoreCase)) fails++;
+        if (!Startup.LinkPath.EndsWith(@"\Microsoft\Windows\Start Menu\Programs\Startup\WinIsle.lnk", StringComparison.OrdinalIgnoreCase)) fails++;
         return fails;
     }
 
@@ -325,7 +325,7 @@ static class Checks
     static int ShelfFailures()
     {
         int fails = 0;
-        var root = Path.Combine(Path.GetTempPath(), "MyTodoShelf" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "WinIsleShelf" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(root);
         try
         {
@@ -470,7 +470,7 @@ static class Checks
     // Hiding sets the value only on keys that exist; restoring clears it everywhere, including nested ids.
     static int BannerFailures()
     {
-        var root = @"Software\MyTodoCheck" + Guid.NewGuid().ToString("N");
+        var root = @"Software\WinIsleCheck" + Guid.NewGuid().ToString("N");
         Func<string, object> banner = id =>
         {
             using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(root + "\\" + id))
@@ -519,7 +519,7 @@ static class Checks
         // Real app id gives a 96 px icon; unknown or empty ids give null, not a crash.
         var settings = AppIcon.For("windows.immersivecontrolpanel_cw5n1h2txyewy!microsoft.windows.immersivecontrolpanel") as System.Windows.Media.Imaging.BitmapSource;
         if (settings == null || settings.PixelWidth != 96) fails++;
-        if (AppIcon.For("MyTodo.NoSuchApp") != null || AppIcon.For("") != null || single.Logo != null) fails++;
+        if (AppIcon.For("WinIsle.NoSuchApp") != null || AppIcon.For("") != null || single.Logo != null) fails++;
 
         // A call jumps the queue, never merges, and survives expiry until answered. Normal and missed ones expire.
         add("Chat", new[] { "Ann", "see you soon" });
@@ -579,7 +579,7 @@ static class Checks
     // Moving data must never lose any: existing targets stay, sources stay.
     static int DataMoveFailures()
     {
-        var root = Path.Combine(Path.GetTempPath(), "MyTodoCheck" + Guid.NewGuid().ToString("N"));
+        var root = Path.Combine(Path.GetTempPath(), "WinIsleCheck" + Guid.NewGuid().ToString("N"));
         string from = Path.Combine(root, "from"), to = Path.Combine(root, "to");
         Directory.CreateDirectory(from);
         Directory.CreateDirectory(to);

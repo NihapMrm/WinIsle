@@ -1,6 +1,6 @@
-# MyTodo
+# WinIsle
 
-MyTodo is a small Windows desktop companion. It has two parts:
+WinIsle is a small Windows desktop companion. It has two parts:
 
 - **Todo panel.** An always-on-top glass panel for a short task list.
 - **Island.** A Dynamic Island–style pill at the top centre of the screen. It shows reminders, Windows notifications, media controls, a timer, a camera mirror, a file shelf and, from a separate panel, clipboard history.
@@ -38,9 +38,9 @@ It is written in C# 5 with WPF, built with the .NET Framework compiler that come
 
 ## Quick start
 
-1. Build: double-click `build.cmd`, or run it from a terminal. It produces `TodoPanel.exe` in the project folder.
-2. Run `TodoPanel.exe`. The todo panel appears, and a thin glass line appears at the top centre of the screen. That line is the island.
-3. To start it with Windows, put a shortcut to `TodoPanel.exe` in the Startup folder. Press `Win+R`, type `shell:startup`, and press Enter to open it. The existing shortcut is called **Todo Panel.lnk**.
+1. Get `WinIsle.exe`: download it from [Releases](https://github.com/NihapMrm/WinIsle/releases), or build it yourself by double-clicking `build.cmd` (see [Building and running](#building-and-running)).
+2. Run `WinIsle.exe`. The todo panel appears, and a thin glass line appears at the top centre of the screen. That line is the island.
+3. To start it with Windows, turn on **Start with Windows** in the Control Center's General page. It adds **WinIsle.lnk** to your Startup folder.
 
 Only one copy can run at a time. A second copy reports that `Ctrl+Alt+T` is already taken and exits.
 
@@ -66,7 +66,7 @@ Clipboard history has its own keys, listed in [Clipboard history](#clipboard-his
 One window that controls the whole app. Open it with `Ctrl+Alt+S`, the gear button on the todo panel, or the gear in the island's media player. `Ctrl+Alt+P` and the moon button open it on the Prayer page.
 
 - **Pages:** Prayer, General, Water, Battery, Notifications, Flashes, Input, Clipboard, Shelf, Sounds and About. Click one in the list on the left. The window opens on the page you used last.
-- **Changes apply at once.** There is no Save button and no restart. The one exception is "Show todo panel on start", which applies the next time MyTodo starts.
+- **Changes apply at once.** There is no Save button and no restart. The one exception is "Show todo panel on start", which applies the next time WinIsle starts.
 - **Switches:** every feature can be turned off: water, prayer and battery reminders, notifications on the island, each flash, the camera and microphone dots, taking over the volume keys, wheel volume, clipboard history, screenshots to the shelf, and sounds (all, or by kind).
 - **Values:** reminder intervals and snoozes, battery thresholds, how long notifications and flashes show, the charging animation's length, prayer offsets and angles, the Asr method (Shafi'i or Hanafi), call words, volume step, clipboard size and sound volume.
 - **Linked switches:** turning notifications off the island brings Windows' own banners back. Turning the volume flash off gives the volume keys back to Windows, so its own pop-up shows.
@@ -130,7 +130,7 @@ Flashes last about 2.2 seconds (Control Center: Flashes), and each kind can be s
 
 **Volume and brightness pills can be adjusted:** scroll on the pill (2% per notch), or click or drag its bar. The pill stays while the mouse is on it.
 
-**Volume keys** are handled by the island itself: it takes the volume up, down and mute keys before Windows does, so Windows' own volume pop-up no longer appears, and the pill shows even at 0% and 100%. If MyTodo closes, Windows handles the keys again.
+**Volume keys** are handled by the island itself: it takes the volume up, down and mute keys before Windows does, so Windows' own volume pop-up no longer appears, and the pill shows even at 0% and 100%. If WinIsle closes, Windows handles the keys again.
 
 **Mouse volume:** hold the mouse wheel down and scroll, anywhere on screen: up raises the volume, down lowers it, 2% per notch, with the island's pill. The page under the mouse doesn't scroll meanwhile. A wheel press released without scrolling still works as a normal middle click (open link in new tab, close tab); only holding the wheel down to drag (browser autoscroll, panning in some apps) is taken over.
 
@@ -217,10 +217,10 @@ They close by themselves after 6 seconds.
 
 To bring the Windows banners back:
 
-1. Quit MyTodo with `Ctrl+Shift+Q` in the panel.
-2. Run `TodoPanel.exe --restore-banners`.
+1. Quit WinIsle with `Ctrl+Shift+Q` in the panel.
+2. Run `WinIsle.exe --restore-banners`.
 
-While MyTodo is closed, banners stay off. New notifications then go only to the Notification Center.
+While WinIsle is closed, banners stay off. New notifications then go only to the Notification Center.
 
 ---
 
@@ -305,7 +305,7 @@ Notes:
 
 ## Where data is stored
 
-Everything is in `C:\Users\<you>\AppData\Local\MyTodo\`, also reachable as `%LOCALAPPDATA%\MyTodo`:
+Everything is in `C:\Users\<you>\AppData\Local\WinIsle\`, also reachable as `%LOCALAPPDATA%\WinIsle`:
 
 | File | Contents |
 |---|---|
@@ -317,7 +317,7 @@ Everything is in `C:\Users\<you>\AppData\Local\MyTodo\`, also reachable as `%LOC
 | `shelf.txt` | Paths of files on the shelf |
 | `settings.txt` | Every Control Center setting, as `key=value` lines. Replaces `shelf-settings.txt`, which is read once and then no longer used |
 
-None of these files are part of the Git repository. If an older version kept data next to `TodoPanel.exe`, it is copied here once, and existing files are never overwritten.
+None of these files are part of the Git repository. If an older version kept data next to `WinIsle.exe`, it is copied here once, and existing files are never overwritten.
 
 To back up or move your data, copy this folder.
 
@@ -328,7 +328,7 @@ To back up or move your data, copy this folder.
 - **Notifications:** the app reads the text of every Windows notification to show it on the island. Windows asks for, or already has, this permission under **Settings > Privacy & security > Notifications**. Nothing is saved or sent anywhere.
 - **Clipboard:** everything you copy is recorded, **including passwords** copied from password managers, by choice. Anyone at your PC can open the history with `Ctrl+Alt+V`. Remove sensitive items with `Del`. Pinned text is saved to disk as Base64, which is not encryption, so avoid pinning passwords.
 - **Camera:** used only while the mirror is open. Nothing is recorded.
-- **Camera and microphone dots:** read from the record Windows keeps for its own privacy indicator. MyTodo does not use the camera or microphone to do this.
+- **Camera and microphone dots:** read from the record Windows keeps for its own privacy indicator. WinIsle does not use the camera or microphone to do this.
 - **Screen:** the island and clipboard panel take a blurred snapshot of the screen behind them to draw their glass. It is kept only in memory and is never saved.
 - **Network:** the app makes no internet connections. Prayer times are calculated on your PC.
 
@@ -342,9 +342,9 @@ To back up or move your data, copy this folder.
 build.cmd
 ```
 
-`build.cmd` calls `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe` on every `.cs` file under `src\`. It references WPF, `System.Drawing` and the Windows Runtime metadata in `%WINDIR%\System32\WinMetadata`, used for notifications, media, camera and battery. The output is `TodoPanel.exe` in the project root. An optional first argument writes the exe somewhere else, for example `build.cmd "%TEMP%\MyTodoCheck.exe"` to run `--check` on a copy while the app keeps running.
+`build.cmd` calls `%WINDIR%\Microsoft.NET\Framework64\v4.0.30319\csc.exe` on every `.cs` file under `src\`. It references WPF, `System.Drawing` and the Windows Runtime metadata in `%WINDIR%\System32\WinMetadata`, used for notifications, media, camera and battery. The output is `WinIsle.exe` in the project root. An optional first argument writes the exe somewhere else, for example `build.cmd "%TEMP%\WinIsleCheck.exe"` to run `--check` on a copy while the app keeps running.
 
-The running app locks `TodoPanel.exe`, so quit it with `Ctrl+Shift+Q` before rebuilding. The compiler supports C# 5 only, so newer features such as `?.`, `$"..."` and `out var` will not compile.
+The running app locks `WinIsle.exe`, so quit it with `Ctrl+Shift+Q` before rebuilding. The compiler supports C# 5 only, so newer features such as `?.`, `$"..."` and `out var` will not compile.
 
 A warning about async calls not being awaited (CS4014) is expected. The media controls are deliberately started without waiting.
 
@@ -354,14 +354,14 @@ A warning about async calls not being awaited (CS4014) is expected. The media co
 
 | Option | What it does |
 |---|---|
-| `TodoPanel.exe` | Normal start |
-| `TodoPanel.exe --check` | Runs the built-in self-checks and exits. The exit code is the number of failures, so `0` means all passed |
-| `TodoPanel.exe --demo` | Shows a prayer reminder island alone. "Not yet" comes back after 10 seconds |
-| `TodoPanel.exe --demo-water` | Same, for the water reminder |
-| `TodoPanel.exe --demo-charge` | Plays the charging animation once (at 72%) and exits |
-| `TodoPanel.exe --demo-unplug` | Plays the unplug animation once (at 72%) and exits |
-| `TodoPanel.exe --demo-power` | Plays the whole battery story with a pretend battery (low alert, plug in, full alert, unplug), about 20 s, then exits |
-| `TodoPanel.exe --restore-banners` | Turns Windows notification banners back on for every app. Quit MyTodo first |
+| `WinIsle.exe` | Normal start |
+| `WinIsle.exe --check` | Runs the built-in self-checks and exits. The exit code is the number of failures, so `0` means all passed |
+| `WinIsle.exe --demo` | Shows a prayer reminder island alone. "Not yet" comes back after 10 seconds |
+| `WinIsle.exe --demo-water` | Same, for the water reminder |
+| `WinIsle.exe --demo-charge` | Plays the charging animation once (at 72%) and exits |
+| `WinIsle.exe --demo-unplug` | Plays the unplug animation once (at 72%) and exits |
+| `WinIsle.exe --demo-power` | Plays the whole battery story with a pretend battery (low alert, plug in, full alert, unplug), about 20 s, then exits |
+| `WinIsle.exe --restore-banners` | Turns Windows notification banners back on for every app. Quit WinIsle first |
 
 The self-checks cover:
 
@@ -400,8 +400,7 @@ Rebuild after any change.
 ## Project layout
 
 ```
-build.cmd                     Builds TodoPanel.exe
-TodoPanel.exe                 The app (built)
+build.cmd                     Builds WinIsle.exe
 src/
   Program.cs                  Entry point, command-line options, starts the island and clipboard
   Checks.cs                   --check self-tests
@@ -461,15 +460,15 @@ src/
 
 | Problem | Fix |
 |---|---|
-| "Ctrl+Alt+T is already taken" | MyTodo is already running, or another app uses that shortcut |
-| Build fails: "Could not write to output file ... TodoPanel.exe" | The app is still running. Quit it with `Ctrl+Shift+Q`, wait a second, and build again |
+| "Ctrl+Alt+T is already taken" | WinIsle is already running, or another app uses that shortcut |
+| Build fails: "Could not write to output file ... WinIsle.exe" | The app is still running. Quit it with `Ctrl+Shift+Q`, wait a second, and build again |
 | Notifications don't reach the island | Check **Settings > Privacy & security > Notifications** and allow apps to access notifications |
 | Seeing both a Windows banner and the island | A brand-new app shows one Windows banner before the island takes over. If banners keep appearing, sign out and back in |
-| Want Windows banners back | Quit MyTodo, then run `TodoPanel.exe --restore-banners` |
+| Want Windows banners back | Quit WinIsle, then run `WinIsle.exe --restore-banners` |
 | Mirror says camera access is off | **Settings > Privacy & security > Camera** > turn on **Let desktop apps access your camera** |
 | Clipboard paste does nothing in one app | That app may run as administrator. The item is still on the clipboard; press `Ctrl+V` yourself |
 | A prayer time is a minute or two off your mosque's timetable | Adjust `Offset` (see [Tuning](#tuning)) |
-| Screenshots don't go onto the shelf | Turn on the camera switch in the shelf's header. Also check Snipping Tool settings: **Automatically save screenshots** must be on (MyTodo watches `Pictures\Screenshots`; restart MyTodo if that folder was just created) |
+| Screenshots don't go onto the shelf | Turn on the camera switch in the shelf's header. Also check Snipping Tool settings: **Automatically save screenshots** must be on (WinIsle watches `Pictures\Screenshots`; restart WinIsle if that folder was just created) |
 | Brightness flash appears by itself | Automatic (adaptive) brightness is changing it; that counts as a change |
 | Shift a prayer that the PC was off for | Open the dashboard and click that prayer's cell to correct it |
 
@@ -486,3 +485,13 @@ src/
 - Windows' brightness pop-up can't be turned off, and the brightness pill can't show at 0% or 100%: the keys are handled by the laptop firmware.
 - Media keys (play/pause, next) still show Windows' own pop-up.
 - Bluetooth mice and keyboards that reconnect after sleep also flash. Battery level is known only for devices Windows shows a battery for in Settings.
+
+---
+
+## Contributing
+
+Issues and pull requests are welcome. Keep to C# 5 (see [Building and running](#building-and-running)) and run `WinIsle.exe --check` before sending a change.
+
+## License
+
+[MIT](LICENSE)

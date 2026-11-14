@@ -28,7 +28,7 @@ partial class ControlCenter
             case "Clipboard": return Page(name, "Clipboard history (Ctrl+Alt+V)", ClipboardCards());
             case "Shelf": return Page(name, "Files held on the island", ShelfCards());
             case "Sounds": return Page(name, "Every sound the island makes", SoundCards());
-            default: return Page(name, "MyTodo", AboutCards());
+            default: return Page(name, "WinIsle", AboutCards());
         }
     }
 
@@ -189,9 +189,9 @@ partial class ControlCenter
         {
             Section("Do not disturb", "Keeps reminders and notifications off the island", Toggle(Settings.Dnd, "Do not disturb"),
                 Line("Still shows", "The timer alarm, previews and flashes. Reminders wait until it's off; notifications stay in Windows' Notification Center. Also the bell at the top of the island's player", new Border())),
-            Section("Startup", "How MyTodo starts", null,
+            Section("Startup", "How WinIsle starts", null,
                 Line("Start with Windows", "A shortcut in your Startup folder", startup),
-                Line("Show todo panel on start", "Applies next time MyTodo starts", Toggle(Settings.ShowPanel, "Show todo panel on start"))),
+                Line("Show todo panel on start", "Applies next time WinIsle starts", Toggle(Settings.ShowPanel, "Show todo panel on start"))),
             Section("Shortcuts", "Work anywhere in Windows", null, keys),
         };
     }
@@ -360,11 +360,11 @@ partial class ControlCenter
 
         return new UIElement[]
         {
-            Section("MyTodo", "Built " + File.GetLastWriteTime(exe).ToString("MMM d, yyyy h:mm tt", Inv), null,
+            Section("WinIsle", "Built " + File.GetLastWriteTime(exe).ToString("MMM d, yyyy h:mm tt", Inv), null,
                 Line("Data folder", AppPaths.Folder, Button("Open", null, () => { try { Process.Start("explorer.exe", "\"" + AppPaths.Folder + "\""); } catch (Exception) { } })),
                 checkRow),
             Section("Reset and quit", "Reset puts every setting back to its default; your tasks, prayers and pins stay", null,
-                Buttons(reset, Button("Quit MyTodo", null, () => Application.Current.Shutdown()))),
+                Buttons(reset, Button("Quit WinIsle", null, () => Application.Current.Shutdown()))),
         };
     }
 }
