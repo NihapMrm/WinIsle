@@ -58,6 +58,9 @@ class TodoPanel : GlassWindow
         header.Children.Add(count);
         var prayersButton = HeaderButton(PrayerReminder.Moon(15), "Prayers (Ctrl+Alt+P)", () => ControlCenter.Open("Prayer"));
         prayersButton.Margin = new Thickness(0, 0, 60, 0);
+        Action showMoon = () => prayersButton.Visibility = Settings.On(Settings.PrayerOn) ? Visibility.Visible : Visibility.Collapsed;
+        showMoon();
+        Settings.Changed += showMoon;
         header.Children.Add(prayersButton);
         var gearGlyph = new TextBlock { Text = "", FontFamily = Icons, FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         var gearButton = HeaderButton(gearGlyph, "Control Center (Ctrl+Alt+S)", () => ControlCenter.Open(null));

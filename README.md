@@ -1,3 +1,5 @@
+<p align="center"><img src="logo.svg" width="128" alt="WinIsle logo"></p>
+
 # WinIsle
 
 WinIsle is a small Windows desktop companion. It has two parts:
@@ -38,7 +40,7 @@ It is written in C# 5 with WPF, built with the .NET Framework compiler that come
 
 ## Quick start
 
-1. Get `WinIsle.exe`: download it from [Releases](https://github.com/NihapMrm/WinIsle/releases), or build it yourself by double-clicking `build.cmd` (see [Building and running](#building-and-running)).
+1. Install: download [WinIsle-Setup.exe](https://github.com/NihapMrm/WinIsle/releases/latest/download/WinIsle-Setup.exe) and run it. See the [install page](https://nihapmrm.github.io/WinIsle/) for help, including the SmartScreen warning. Or use the portable `WinIsle.exe` from [Releases](https://github.com/NihapMrm/WinIsle/releases), or build it yourself with `build.cmd` (see [Building and running](#building-and-running)).
 2. Run `WinIsle.exe`. The todo panel appears, and a thin glass line appears at the top centre of the screen. That line is the island.
 3. To start it with Windows, turn on **Start with Windows** in the Control Center's General page. It adds **WinIsle.lnk** to your Startup folder.
 
@@ -65,7 +67,7 @@ Clipboard history has its own keys, listed in [Clipboard history](#clipboard-his
 
 One window that controls the whole app. Open it with `Ctrl+Alt+S`, the gear button on the todo panel, or the gear in the island's media player. `Ctrl+Alt+P` and the moon button open it on the Prayer page.
 
-- **Pages:** Prayer, General, Water, Battery, Notifications, Flashes, Input, Clipboard, Shelf, Sounds and About. Click one in the list on the left. The window opens on the page you used last.
+- **Pages:** General, Water, Battery, Notifications, Flashes, Input, Clipboard, Prayer, Shelf, Sounds and About. The Prayer page shows only while the **Prayer** switch on the General page is on. Click one in the list on the left. The window opens on the page you used last.
 - **Changes apply at once.** There is no Save button and no restart. The one exception is "Show todo panel on start", which applies the next time WinIsle starts.
 - **Switches:** every feature can be turned off: water, prayer and battery reminders, notifications on the island, each flash, the camera and microphone dots, taking over the volume keys, wheel volume, clipboard history, screenshots to the shelf, and sounds (all, or by kind).
 - **Values:** reminder intervals and snoozes, battery thresholds, how long notifications and flashes show, the charging animation's length, prayer offsets and angles, the Asr method (Shafi'i or Hanafi), call words, volume step, clipboard size and sound volume.
@@ -142,6 +144,8 @@ Flashes last about 2.2 seconds (Control Center: Flashes), and each kind can be s
 
 ## Prayer reminders and dashboard
 
+Prayer can be switched off entirely in Control Center: General. That hides the Prayer page and the moon button, makes `Ctrl+Alt+P` open the Control Center normally, and stops the reminders. Your prayer log is kept.
+
 ### Reminders
 
 - At each prayer time, the island shows the prayer with **Not yet**, **Later** and **Prayed**.
@@ -166,7 +170,7 @@ These were checked against aladhan.com to within one minute. The ACJU (Sri Lanka
 The dashboard is the Prayer page of the [Control Center](#control-center). Open it with `Ctrl+Alt+P` or the moon button on the todo panel.
 
 - **Location & time zone:** set place name, latitude, longitude and time zone.
-- **Prayer reminders** (below the history): switch reminders off, change the snooze, the Fajr and Isha angles, the Asr method and each prayer's offset. The times on the page update as you change them.
+- **Prayer reminders** (below the history): change the snooze, the Fajr and Isha angles, the Asr method and each prayer's offset. The times on the page update as you change them.
 - **Today:** shows each prayer's status. Click a cell to correct it.
 - **History and charts:** show prayed and missed counts over time, streaks and per-prayer analytics. Click a history cell to correct a past day.
 - Prayed is shown in blue and Missed in orange, each with a shape icon, so the colours remain distinguishable for colour-blind users.
@@ -346,6 +350,8 @@ build.cmd
 
 The running app locks `WinIsle.exe`, so quit it with `Ctrl+Shift+Q` before rebuilding. The compiler supports C# 5 only, so newer features such as `?.`, `$"..."` and `out var` will not compile.
 
+**Installer:** with [Inno Setup 6](https://jrsoftware.org/isinfo.php) installed, run `iscc /DAppVersion=1.1.0 installer.iss` after `build.cmd`. It writes `dist\WinIsle-Setup.exe`, a per-user installer (no administrator rights) with a Start menu entry, an optional Start with Windows shortcut and an uninstaller that turns Windows notification banners back on.
+
 A warning about async calls not being awaited (CS4014) is expected. The media controls are deliberately started without waiting.
 
 ---
@@ -401,6 +407,9 @@ Rebuild after any change.
 
 ```
 build.cmd                     Builds WinIsle.exe
+installer.iss                 Inno Setup script for WinIsle-Setup.exe
+logo.svg, logo.ico            Logo and app icon
+docs/index.html               Install page (GitHub Pages)
 src/
   Program.cs                  Entry point, command-line options, starts the island and clipboard
   Checks.cs                   --check self-tests

@@ -8,11 +8,14 @@ using System.Windows.Interop;
 using System.Windows.Media;
 
 // One window for the whole app: a page list on the left, the chosen page on the right. The prayer dashboard
-// is its first page (ControlCenter.Prayer*.cs); every other page is a column of settings cards
-// (ControlCenter.Pages.cs). Settings apply the moment they change.
+// is one page (ControlCenter.Prayer*.cs), listed only while prayer is on; every other page is a column of
+// settings cards (ControlCenter.Pages.cs). Settings apply the moment they change.
 partial class ControlCenter : DashboardWindow
 {
-    internal static readonly string[] Pages = { "Prayer", "General", "Water", "Battery", "Notifications", "Flashes", "Input", "Clipboard", "Shelf", "Sounds", "About" };
+    internal static readonly string[] Pages = { "General", "Water", "Battery", "Notifications", "Flashes", "Input", "Clipboard", "Prayer", "Shelf", "Sounds", "About" };
+
+    // The Prayer page goes away with the prayer switch (General page).
+    internal static bool Listed(string page) { return Pages.Contains(page) && (page != "Prayer" || Settings.On(Settings.PrayerOn)); }
 
     const double NavW = 200, PageW = 1120; // the page keeps the prayer dashboard's width, so its layout is unchanged
 
@@ -34,7 +37,7 @@ partial class ControlCenter : DashboardWindow
     internal static void Open(string page)
     {
         if (Opening != null) Opening();
-        if (page == null || !Pages.Contains(page)) page = Pages.Contains(Settings.Text(Settings.LastPage)) ? Settings.Text(Settings.LastPage) : "General";
+        if (page == null || !Listed(page)) page = Listed(Settings.Text(Settings.LastPage)) ? Settings.Text(Settings.LastPage) : "General";
         if (open == null)
         {
             open = new ControlCenter();
@@ -93,7 +96,14 @@ partial class ControlCenter : DashboardWindow
 
         BuildNav();
 
-        onSettingsChanged = () => { foreach (var r in refreshers) r(); };
+        bool prayerOn = Settings.On(Settings.PrayerOn);
+        refreshers.Add(() =>
+        {
+            if (prayerOn == Settings.On(Settings.PrayerOn)) return;
+            prayerOn = !prayerOn;
+            if (!prayerOn && page == "Prayer") ShowPage("General"); else BuildNav();
+        });
+        onSettingsChanged = () => { foreach (var r in refreshers.ToArray()) r(); };
         Settings.Changed += onSettingsChanged;
         Closed += (s, e) => { Settings.Changed -= onSettingsChanged; StopPrayer(); };
 
@@ -110,7 +120,7 @@ partial class ControlCenter : DashboardWindow
     void BuildNav()
     {
         nav.Children.Clear();
-        foreach (var name in Pages)
+        foreach (var name in Pages.Where(Listed))
         {
             string target = name;
             bool selected = name == page;

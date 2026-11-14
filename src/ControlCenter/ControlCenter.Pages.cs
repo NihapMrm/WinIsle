@@ -150,8 +150,8 @@ partial class ControlCenter
             field.Margin = new Thickness(0, 0, 18, 10);
             offsets.Children.Add(field);
         }
-        var card = Section("Prayer reminders", "The island asks at each prayer time; times follow these settings", Toggle(Settings.PrayerOn, "Prayer reminders"),
-            Dimmed(Settings.PrayerOn, "Not yet brings it back after", null, Number(Settings.PrayerSnooze, 1, "min", "Prayer snooze")),
+        var card = Section("Prayer reminders", "The island asks at each prayer time; times follow these settings. Turn prayer off on the General page", null,
+            Line("Not yet brings it back after", null, Number(Settings.PrayerSnooze, 1, "min", "Prayer snooze")),
             Line("Asr method", "Shafi'i: shadow length 1. Hanafi: 2, later", asr),
             Line("Fajr angle", "Sun below the horizon, degrees", Number(Settings.FajrAngle, 0.5, "°", "Fajr angle")),
             Line("Isha angle", null, Number(Settings.IshaAngle, 0.5, "°", "Isha angle")),
@@ -189,6 +189,7 @@ partial class ControlCenter
         {
             Section("Do not disturb", "Keeps reminders and notifications off the island", Toggle(Settings.Dnd, "Do not disturb"),
                 Line("Still shows", "The timer alarm, previews and flashes. Reminders wait until it's off; notifications stay in Windows' Notification Center. Also the bell at the top of the island's player", new Border())),
+            Section("Prayer", "Prayer times, reminders and the Prayer page. Off hides them all; your prayer log is kept", Toggle(Settings.PrayerOn, "Prayer")),
             Section("Startup", "How WinIsle starts", null,
                 Line("Start with Windows", "A shortcut in your Startup folder", startup),
                 Line("Show todo panel on start", "Applies next time WinIsle starts", Toggle(Settings.ShowPanel, "Show todo panel on start"))),
