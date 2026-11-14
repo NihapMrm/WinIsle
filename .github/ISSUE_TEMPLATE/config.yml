@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea to discuss
+    url: https://github.com/NihapMrm/WinIsle/discussions
+    about: Ask how something works or share an idea before it becomes a request.
+  - name: Security problem
+    url: https://github.com/NihapMrm/WinIsle/security/advisories/new
+    about: Report vulnerabilities privately, not as a public issue.
